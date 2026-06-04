@@ -59,7 +59,9 @@ def get_device(prefer: str = "auto") -> torch.device:
         return torch.device("cpu")
 
     cuda_ok = torch.cuda.is_available()
-    mps_ok = bool(getattr(torch.backends, "mps", None)) and torch.backends.mps.is_available()
+    mps_ok = (
+        bool(getattr(torch.backends, "mps", None)) and torch.backends.mps.is_available()
+    )
 
     if prefer == "cuda":
         return torch.device("cuda") if cuda_ok else torch.device("cpu")

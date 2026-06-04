@@ -47,8 +47,12 @@ def get_train_transforms(image_size: int = IMAGE_SIZE) -> transforms.Compose:
         [
             transforms.RandomResizedCrop(image_size, scale=(0.85, 1.0)),
             transforms.RandomRotation(15),
-            transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1), shear=5),
-            transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.2, hue=0.05),
+            transforms.RandomAffine(
+                degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1), shear=5
+            ),
+            transforms.ColorJitter(
+                brightness=0.3, contrast=0.3, saturation=0.2, hue=0.05
+            ),
             transforms.ToTensor(),
             transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
         ]
@@ -85,7 +89,9 @@ def get_class_names(root_dir: str | Path | None = None) -> list[str]:
     return list(CLASS_NAMES)
 
 
-def _list_samples(root_dir: str | Path, class_names: list[str]) -> list[tuple[str, int]]:
+def _list_samples(
+    root_dir: str | Path, class_names: list[str]
+) -> list[tuple[str, int]]:
     """Walk class folders and return ``(filepath, label_int)`` for every image."""
     root = Path(root_dir)
     label_of = {name: idx for idx, name in enumerate(class_names)}
@@ -162,7 +168,9 @@ def make_stratified_splits(
     labels = [s[1] for s in samples]
 
     # First split: train vs (val+test).
-    sss1 = StratifiedShuffleSplit(n_splits=1, test_size=val_frac + test_frac, random_state=seed)
+    sss1 = StratifiedShuffleSplit(
+        n_splits=1, test_size=val_frac + test_frac, random_state=seed
+    )
     train_idx, rest_idx = next(sss1.split(files, labels))
 
     rest_files = [files[i] for i in rest_idx]
@@ -187,7 +195,9 @@ def _print_stats(data_dir: str) -> None:
     print(f"Data dir: {data_dir}")
     print(f"Classes found: {len(class_names)}")
     print(f"Total images: {len(samples)}")
-    per_class = {class_names[lbl]: counts.get(lbl, 0) for lbl in range(len(class_names))}
+    per_class = {
+        class_names[lbl]: counts.get(lbl, 0) for lbl in range(len(class_names))
+    }
     print(f"Per-class counts: {per_class}")
 
     train, val, test = make_stratified_splits(data_dir)
@@ -196,6 +206,8 @@ def _print_stats(data_dir: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Print ASL dataset statistics.")
-    parser.add_argument("--data_dir", default="data/sample", help="Path to class folders.")
+    parser.add_argument(
+        "--data_dir", default="data/sample", help="Path to class folders."
+    )
     args = parser.parse_args()
     _print_stats(args.data_dir)
