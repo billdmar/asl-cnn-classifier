@@ -1,0 +1,16 @@
+# Core ML / CV stack — pinned to major versions for reproducibility.
+# On Apple Silicon, the default PyPI wheels include MPS support.
+torch>=2.2,<3.0
+torchvision>=0.17,<1.0
+opencv-python-headless>=4.8,<5.0
+numpy>=1.26,<2.2
+scikit-learn>=1.3,<2.0
+matplotlib>=3.7,<4.0
+seaborn>=0.13,<1.0
+tensorboard>=2.15,<3.0
+PyYAML>=6.0,<7.0
+pillow>=10.0,<12.0
+tqdm>=4.66,<5.0
+
+# Optional: dataset download from Kaggle (needs ~/.kaggle/kaggle.json).
+kaggle>=1.6,<2.0

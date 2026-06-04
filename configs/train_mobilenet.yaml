@@ -1,0 +1,36 @@
+# Training configuration — MobileNetV2 transfer-learning fine-tune.
+# This is the variant that reliably reaches >=98% on the full dataset:
+# freeze the backbone for `warmup_epochs`, then unfreeze and fine-tune at a
+# 10x-lower LR. CLI flags override any value here.
+
+# Data
+data_dir: data/asl_alphabet_train/asl_alphabet_train
+image_size: 128
+train_frac: 0.70
+val_frac: 0.15
+test_frac: 0.15
+
+# Model
+arch: mobilenet_v2
+num_classes: 29
+pretrained: true
+
+# Optimization
+batch_size: 64
+num_epochs: 20
+learning_rate: 0.001      # head LR during warm-up
+weight_decay: 0.0001
+optimizer: adamw
+lr_scheduler: cosine
+warmup_epochs: 5          # epochs with frozen backbone before fine-tuning
+
+# Training behavior
+seed: 42
+num_workers: 4
+amp: false                # auto-disabled on non-CUDA devices
+early_stopping_patience: 10
+device: auto
+
+# Output
+checkpoint_dir: artifacts/checkpoints
+tensorboard_dir: artifacts/runs

@@ -1,0 +1,35 @@
+# ─── Python ─────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# ─── Virtual environments ───────────────────────────────────
+.venv/
+venv/
+env/
+
+# ─── ML artifacts (large binaries — regenerated at runtime) ──
+artifacts/*
+!artifacts/.gitkeep
+runs/
+*.pth
+*.pt
+*.onnx
+
+# ─── Dataset (downloaded, not committed — except the sample) ─
+data/*
+!data/sample/
+!data/sample/**
+
+# ─── Editor / OS ────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.swp
