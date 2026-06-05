@@ -1,5 +1,7 @@
 # ASL Sign-Language CNN — Real-Time Image Classifier
 
+**Full ML-engineering lifecycle for 29-class ASL recognition: PyTorch CNN + MobileNetV2 transfer learning, real-time OpenCV inference, and rigorous benchmarking.**
+
 Recognize American Sign Language hand signs across all **29 classes** (A–Z plus
 *space*, *delete*, *nothing*) with a PyTorch CNN, then run the trained model in a
 **live OpenCV camera loop** for real-time classification. The project covers the
@@ -8,6 +10,7 @@ augmentation-aware training, confusion-matrix evaluation, live inference, and a
 latency/throughput benchmark with preprocessing ablations and distribution-shift
 analysis.
 
+[![CI](https://github.com/billdmar/asl-cnn-classifier/actions/workflows/ci.yml/badge.svg)](https://github.com/billdmar/asl-cnn-classifier/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white)
 ![OpenCV](https://img.shields.io/badge/OpenCV-4.x-5C3EE8?logo=opencv&logoColor=white)
