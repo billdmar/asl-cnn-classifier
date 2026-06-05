@@ -119,8 +119,9 @@ then fine-tunes end-to-end at a 10× lower learning rate.
 ## Preprocessing ablation & distribution shift
 
 `make benchmark` localizes the inference bottleneck by progressively removing
-preprocessing stages. On this machine, resize + normalize add ~2.4 ms on top of
-the ~4.6 ms model forward pass (see `artifacts/benchmark_ablation.png`).
+preprocessing stages. On this machine the model forward pass is roughly half of
+end-to-end latency; resize and normalization account for most of the rest (see
+`artifacts/benchmark_ablation.png`).
 
 It also characterizes how accuracy degrades under five synthetic corruptions
 (Gaussian blur, JPEG q20, brightness ×0.4 / ×1.8, 5% salt-and-pepper) →
