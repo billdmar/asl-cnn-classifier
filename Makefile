@@ -3,7 +3,7 @@
 
 PY := .venv/bin/python
 
-.PHONY: install sample-train train eval benchmark camera test lint format docker-build clean
+.PHONY: install sample-train train eval benchmark benchmark-backends export-onnx quantize serve camera test lint format docker-build clean
 
 # Create the venv, install dev deps, and regenerate the committed sample data.
 install:
@@ -26,6 +26,22 @@ eval:
 # Inference throughput/latency benchmark.
 benchmark:
 	$(PY) -m src.benchmark --num_frames 1000 --device cpu --test_dir data/sample
+
+# Multi-backend latency benchmark (PyTorch FP32 / ONNX Runtime / INT8) on CPU.
+benchmark-backends:
+	$(PY) -m src.benchmark_backends --num_frames 200 --source data/sample
+
+# Export the model to ONNX (dynamic batch axis, fixed 3x128x128).
+export-onnx:
+	$(PY) -m src.export_onnx --output artifacts/model.onnx --device cpu
+
+# Dynamic INT8 quantization + on-disk FP32 vs INT8 size report.
+quantize:
+	$(PY) -m src.quantize --output artifacts/quantization.json --device cpu
+
+# Run the FastAPI inference service (GET /health, POST /predict).
+serve:
+	$(PY) -m uvicorn src.serve:app --host 0.0.0.0 --port 8000
 
 # Live webcam inference.
 camera:
