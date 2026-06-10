@@ -3,7 +3,7 @@
 
 PY := .venv/bin/python
 
-.PHONY: install sample-train train eval gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format docker-build clean
+.PHONY: install sample-train train eval gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test clean
 
 # Create the venv, install dev deps, and regenerate the committed sample data.
 install:
@@ -67,9 +67,24 @@ lint:
 format:
 	$(PY) -m black src tests && $(PY) -m ruff check --fix src tests
 
+# Static type-check gate (scoped to src via pyproject.toml).
+mypy:
+	$(PY) -m mypy src
+
+# Alias for the type-check gate.
+typecheck: mypy
+
 # Build the CPU Docker image.
 docker-build:
 	docker build -t asl-cnn-classifier .
+
+# Run a headless single-image inference inside the container (proves the image works).
+docker-run:
+	docker run --rm asl-cnn-classifier \
+		python -m src.infer_camera --source data/sample/A/0.png --device cpu
+
+# Build the image, then run in-container inference end-to-end.
+docker-test: docker-build docker-run
 
 # Remove generated artifacts (keeping .gitkeep) and bytecode caches.
 clean:
