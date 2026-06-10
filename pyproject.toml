@@ -1,0 +1,31 @@
+# Tooling configuration for the ASL CNN classifier.
+#
+# ruff and black are run with their defaults (see the Makefile / CI); only the
+# mypy type-checking gate is configured here. The gate is scoped to ``src`` and
+# kept pragmatic: it catches genuine type errors without flooding the build with
+# noise from third-party libraries that don't ship type stubs.
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src"]
+ignore_missing_imports = false
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+# The codebase uses explicit type hints but not exhaustively; keep the gate
+# focused on real bugs rather than demanding annotations everywhere.
+check_untyped_defs = true
+
+# Third-party libraries without bundled type stubs / py.typed markers. We trust
+# their runtime behavior and only type-check our own usage at the call sites.
+[[tool.mypy.overrides]]
+module = [
+    "torchvision.*",
+    "sklearn.*",
+    "seaborn.*",
+    "cv2.*",
+    "matplotlib.*",
+    "tensorboard.*",
+    "onnxruntime.*",
+]
+ignore_missing_imports = true

@@ -11,7 +11,7 @@ latency/throughput benchmark with preprocessing ablations and distribution-shift
 analysis.
 
 [![CI](https://github.com/billdmar/asl-cnn-classifier/actions/workflows/ci.yml/badge.svg)](https://github.com/billdmar/asl-cnn-classifier/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white)
 ![OpenCV](https://img.shields.io/badge/OpenCV-4.x-5C3EE8?logo=opencv&logoColor=white)
 ![Coverage](https://img.shields.io/badge/coverage-94%25%20(CI%20gate%20%E2%89%A580%25)-brightgreen)
@@ -34,8 +34,11 @@ analysis.
   confused pairs, and accuracy under five synthetic distribution shifts.
 - **Benchmarked** — end-to-end latency (p50/p95/p99) and throughput on CPU and
   Apple-Silicon MPS, plus a preprocessing-stage ablation.
-- **Engineered** — 94% test coverage, GitHub Actions CI, Dockerfile, Makefile,
-  TensorBoard logging, and a full MODEL_CARD.
+- **Engineered** — 94% test coverage with an 80% CI gate, a GitHub Actions CI
+  matrix (Python 3.11 & 3.12) running ruff + black + a `mypy src` type-check gate
+  plus a sample-train → eval → inference smoke sequence, a separate Docker job that
+  builds the image and runs headless inference in-container, TensorBoard logging,
+  and a full MODEL_CARD.
 
 ## Results
 
@@ -74,6 +77,10 @@ make gradcam          # Grad-CAM overlay (artifacts/gradcam/<class>.png)
 make calibration      # ECE + reliability diagram (artifacts/calibration.json)
 make benchmark        # latency/throughput + preprocessing ablation + dist-shift
 make test             # pytest suite with coverage (>=80% enforced)
+make typecheck        # mypy type-check gate (scoped to src/)
+
+# Container: build the CPU image and run headless inference inside it
+make docker-test      # docker build + in-container `infer_camera` on the sample
 
 # Per-class F1 bar chart from an existing metrics.json:
 python -m src.plot_per_class --metrics artifacts/metrics.json

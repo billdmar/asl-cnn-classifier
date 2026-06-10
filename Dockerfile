@@ -4,6 +4,13 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# opencv-python-headless still dynamically links libglib at import time; install
+# the minimal runtime lib so `import cv2` works on the slim base. (No GUI/GL
+# libraries are needed because we use the headless OpenCV wheel.)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install torch/torchvision from the CPU wheel index first, then the remaining
 # dependencies from PyPI. (No build-essentials needed: all deps ship wheels.)
 COPY requirements.txt ./
@@ -12,12 +19,17 @@ RUN pip install --no-cache-dir \
         "torch>=2.2,<3.0" "torchvision>=0.17,<1.0" \
     && pip install --no-cache-dir -r requirements.txt
 
-# Copy the project source.
+# Copy the project source (includes the committed data/sample fixture, so the
+# image can run a headless inference end-to-end without external data).
 COPY . .
 
 # No network ports are served; this is a batch/CLI image. (No EXPOSE.)
-# Default to a harmless no-op that proves the package imports cleanly.
-CMD ["python", "-m", "src.eval", "--help"]
+# Default to a headless single-image inference on the committed sample fixture,
+# which proves the full preprocess -> model -> prediction path runs in-container.
+# (If no trained checkpoint is baked in, infer_camera falls back to a randomly
+# initialized model with a warning, so this stays runnable out of the box.)
+CMD ["python", "-m", "src.infer_camera", \
+     "--source", "data/sample/A/0.png", "--device", "cpu"]
 
 # ---------------------------------------------------------------------------
 # GPU variant (commented): swap the base image for a CUDA-enabled PyTorch image
