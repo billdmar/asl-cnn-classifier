@@ -19,6 +19,36 @@ analysis.
 
 ---
 
+## Live demo
+
+A [Gradio](https://gradio.app) app (`app.py`) lets you upload a hand-sign image
+and see the predicted class plus top-5 probabilities. It is built to deploy on
+Hugging Face Spaces.
+
+> **Not yet deployed.** No live Space exists yet — see
+> [`docs/DEPLOY.md`](docs/DEPLOY.md) for the one-time push steps. Once deployed,
+> the URL goes here:
+>
+> <!-- TODO: paste your Hugging Face Space URL here after deploying, e.g.
+>      [Try it on Hugging Face Spaces](https://huggingface.co/spaces/<you>/asl-cnn-classifier) -->
+>
+> <!-- TODO: add a demo GIF/screenshot here, e.g. ![demo](docs/demo.gif) -->
+
+Run it locally:
+
+```bash
+make install
+.venv/bin/python -m pip install gradio    # or: uv pip install gradio
+.venv/bin/python app.py                   # opens http://127.0.0.1:7860
+```
+
+> Heads-up: with no trained checkpoint present, the app (and CLI) fall back to
+> an **untrained random-init** model — predictions are meaningless and the UI
+> says so. Train a model first (see [Reproducing 98%](#reproducing-the-98-accuracy-target))
+> for real results.
+
+---
+
 ## Highlights
 
 - **Two architectures** — a compact from-scratch CNN (~657K params) and a
@@ -61,8 +91,40 @@ analysis.
 | MPS throughput | **785 FPS** | measured, this machine |
 
 *Latency/throughput measured with `make benchmark` (1000 frames, warm-up
-excluded) on an Apple-Silicon Mac. CPU/GPU numbers are real today and do not
-depend on training.*
+excluded) on the author's Apple-Silicon Mac. These numbers do not depend on
+training (they time the forward pass + preprocessing with any weights), so they
+reproduce on a fresh checkout — but the raw `artifacts/benchmark_results.json`
+is regenerated at runtime (the `artifacts/` directory is git-ignored) rather
+than committed, and the exact figures vary with hardware. On a CPU sandbox,
+`make benchmark` here reports ~6 ms/frame, consistent with the ~5 ms above.*
+
+## Reproduce in 5 minutes
+
+The fastest path from a clean clone to a running pipeline — entirely on the
+committed 232-image synthetic sample (no Kaggle download, no GPU). This proves
+the wiring end-to-end; it does **not** produce meaningful accuracy (that needs
+the real dataset — see [Reproducing 98%](#reproducing-the-98-accuracy-target)).
+
+```bash
+# 0. Prereq: install uv (https://docs.astral.sh/uv/) — e.g. `brew install uv`.
+git clone https://github.com/billdmar/asl-cnn-classifier && cd asl-cnn-classifier
+
+make install        # uv venv (Py 3.12) + deps + regenerate sample data
+make sample-train   # 2-epoch smoke train on the 232-image sample → best_model.pth (CPU, <60s)
+make eval           # confusion matrix + per-class F1 on the sample → artifacts/metrics.json
+make benchmark      # CPU latency/throughput + preprocessing ablation + dist-shift
+
+# Try the Gradio demo app (image upload → class + top-5):
+uv pip install gradio
+.venv/bin/python app.py                 # http://127.0.0.1:7860
+# ...or classify one image headlessly, no server:
+.venv/bin/python -m src.infer_camera --source data/sample/A/0.png --device cpu
+```
+
+Everything above runs CPU-only in a couple of minutes. `make sample-train`
+writes `artifacts/checkpoints/best_model.pth`, which `make eval`, `make
+benchmark`, and the demo app then pick up automatically. Accuracy on the sample
+is **meaningless by design** — it is a wiring fixture.
 
 ## Quickstart
 
@@ -166,7 +228,9 @@ src/
   benchmark.py      # latency/throughput + preprocessing ablation
   download_data.py  # Kaggle download helper
   utils.py          # seeding, device selection (CUDA → MPS → CPU)
-tests/              # 73 tests, 94% coverage
+app.py              # Gradio demo app (HF Spaces entry point)
+docs/DEPLOY.md      # one-time Hugging Face Space deployment steps
+tests/              # test suite with coverage (see the Tests badge)
 configs/            # train_custom_cnn.yaml, train_mobilenet.yaml
 data/sample/        # 232 committed sample images (CI fixture)
 ```
