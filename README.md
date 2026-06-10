@@ -70,8 +70,13 @@ make install
 # 2. Run the whole pipeline on the committed sample subset — no Kaggle needed
 make sample-train     # trains 2 epochs on the 232-image sample fixture (CPU, <60s)
 make eval             # confusion matrix, per-class F1, metrics.json
+make gradcam          # Grad-CAM overlay (artifacts/gradcam/<class>.png)
+make calibration      # ECE + reliability diagram (artifacts/calibration.json)
 make benchmark        # latency/throughput + preprocessing ablation + dist-shift
 make test             # pytest suite with coverage (>=80% enforced)
+
+# Per-class F1 bar chart from an existing metrics.json:
+python -m src.plot_per_class --metrics artifacts/metrics.json
 
 # 3. Real-time camera demo (needs a webcam)
 make camera
