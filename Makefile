@@ -3,7 +3,7 @@
 
 PY := .venv/bin/python
 
-.PHONY: install sample-train train eval benchmark benchmark-backends export-onnx quantize serve camera test lint format docker-build clean
+.PHONY: install sample-train train eval gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format docker-build clean
 
 # Create the venv, install dev deps, and regenerate the committed sample data.
 install:
@@ -22,6 +22,14 @@ train:
 # Evaluate a trained checkpoint (uses sample data here for a fast check).
 eval:
 	$(PY) -m src.eval --config configs/train_custom_cnn.yaml --checkpoint artifacts/checkpoints/best_model.pth --data_dir data/sample
+
+# Grad-CAM explainability overlay for a single image (uses sample data here).
+gradcam:
+	$(PY) -m src.gradcam --checkpoint artifacts/checkpoints/best_model.pth --source data/sample/A/0.png --device cpu
+
+# Calibration: Expected Calibration Error + reliability diagram on the test split.
+calibration:
+	$(PY) -m src.calibration --checkpoint artifacts/checkpoints/best_model.pth --data_dir data/sample --device cpu
 
 # Inference throughput/latency benchmark.
 benchmark:
