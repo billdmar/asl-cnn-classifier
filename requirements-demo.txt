@@ -1,0 +1,9 @@
+# Dependencies for the Gradio demo app (app.py).
+# Kept separate from requirements.txt / requirements-dev.txt so the demo's UI
+# stack does not perturb the core training/CI dependency set.
+#
+# Hugging Face Spaces installs this automatically when the Space SDK is set to
+# `gradio` and this file is named `requirements.txt` in the Space — see
+# docs/DEPLOY.md for how the core deps are combined for deployment.
+-r requirements.txt
+gradio>=4.0,<6.0
