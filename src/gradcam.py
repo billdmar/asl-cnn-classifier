@@ -171,15 +171,15 @@ class GradCAM:
 
         h, w = input_tensor.shape[2], input_tensor.shape[3]
         cam = F.interpolate(cam, size=(h, w), mode="bilinear", align_corners=False)
-        cam = cam.squeeze().cpu().numpy().astype(np.float32)
+        cam_np = cam.squeeze().cpu().numpy().astype(np.float32)
 
         # Min-max normalize to [0, 1]; a flat map (e.g. all-zero ReLU) stays 0.
-        cam_min, cam_max = float(cam.min()), float(cam.max())
+        cam_min, cam_max = float(cam_np.min()), float(cam_np.max())
         if cam_max > cam_min:
-            cam = (cam - cam_min) / (cam_max - cam_min)
+            cam_np = (cam_np - cam_min) / (cam_max - cam_min)
         else:
-            cam = np.zeros_like(cam)
-        return cam, class_idx
+            cam_np = np.zeros_like(cam_np)
+        return cam_np, class_idx
 
 
 def overlay_cam_on_image(

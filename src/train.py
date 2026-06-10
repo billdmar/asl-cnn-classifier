@@ -194,6 +194,7 @@ def run_epoch(
             targets = targets.to(device, non_blocking=True)
 
             if is_train:
+                assert optimizer is not None  # implied by is_train
                 optimizer.zero_grad(set_to_none=True)
 
             with torch.autocast(device_type=device.type, enabled=autocast_enabled):
@@ -201,6 +202,7 @@ def run_epoch(
                 loss = criterion(outputs, targets)
 
             if is_train:
+                assert optimizer is not None  # implied by is_train
                 if use_amp:
                     scaler.scale(loss).backward()
                     scaler.step(optimizer)
@@ -303,6 +305,7 @@ def main() -> None:
     is_transfer = isinstance(model, TransferModel)
     use_warmup = is_transfer and warmup_epochs > 0
     if use_warmup:
+        assert isinstance(model, TransferModel)  # implied by is_transfer
         model.freeze_backbone()
         print(f"Backbone frozen for {warmup_epochs} warm-up epoch(s).")
 
@@ -330,6 +333,7 @@ def main() -> None:
     for epoch in range(1, num_epochs + 1):
         # Transition from frozen warm-up to full fine-tuning at 10x-lower LR.
         if use_warmup and not fine_tune_started and epoch > warmup_epochs:
+            assert isinstance(model, TransferModel)  # implied by use_warmup
             model.unfreeze_backbone()
             fine_tune_started = True
             ft_lr = base_lr / 10.0

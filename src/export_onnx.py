@@ -59,7 +59,7 @@ def export_to_onnx(
 
     torch.onnx.export(
         model,
-        dummy,
+        (dummy,),
         str(output_path),
         input_names=["input"],
         output_names=["logits"],

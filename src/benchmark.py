@@ -169,7 +169,7 @@ def _time_pipeline(
 
 def _ablation(
     model: nn.Module, frames: list[np.ndarray], device: torch.device
-) -> list[dict[str, float]]:
+) -> list[dict[str, str | float]]:
     """Measure mean latency for five progressively reduced pipelines.
 
     Variants:
@@ -219,7 +219,7 @@ def _ablation(
             lat.append((time.perf_counter() - start) * 1000.0)
         return float(np.mean(lat))
 
-    results = [
+    results: list[dict[str, str | float]] = [
         {"stage": "full", "mean_ms": _time_pipeline(model, frames, device, full)},
         # ColorJitter is absent at eval — identical to full (documented no-op).
         {
@@ -239,10 +239,10 @@ def _ablation(
     return results
 
 
-def _save_ablation_chart(ablation: list[dict[str, float]], path: Path) -> None:
+def _save_ablation_chart(ablation: list[dict[str, str | float]], path: Path) -> None:
     """Save a bar chart of mean latency per ablation stage."""
-    stages = [a["stage"] for a in ablation]
-    values = [a["mean_ms"] for a in ablation]
+    stages = [str(a["stage"]) for a in ablation]
+    values = [float(a["mean_ms"]) for a in ablation]
     fig, ax = plt.subplots(figsize=(9, 5))
     bars = ax.bar(range(len(stages)), values, color="#4C78A8")
     ax.set_ylabel("Mean latency (ms)")

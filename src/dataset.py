@@ -128,6 +128,7 @@ class ASLDataset(Dataset):
             raise ValueError("Provide either root_dir or samples.")
         self.class_names = class_names or get_class_names(root_dir)
         if samples is None:
+            assert root_dir is not None  # guaranteed by the check above
             samples = _list_samples(root_dir, self.class_names)
         self.samples = samples
         self.transform = transform or get_eval_transforms()

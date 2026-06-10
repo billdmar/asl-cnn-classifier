@@ -9,7 +9,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
 
@@ -19,18 +23,21 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "requirements*.txt"
 
-      - name: Set up Python 3.12
-        run: uv python install 3.12
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
 
       - name: Create venv and install dependencies
         run: |
-          uv venv --python 3.12
+          uv venv --python ${{ matrix.python-version }}
           uv pip install -r requirements-dev.txt
 
       - name: Lint (ruff + black)
         run: |
           .venv/bin/python -m ruff check src tests
           .venv/bin/python -m black --check src tests
+
+      - name: Type check (mypy gate)
+        run: .venv/bin/python -m mypy src
 
       - name: Sample train (sanity check on committed fixture)
         run: .venv/bin/python -m src.train --config configs/train_custom_cnn.yaml --data_dir data/sample --num_epochs 2 --device cpu
@@ -43,3 +50,17 @@ jobs:
 
       - name: Tests with coverage gate
         run: .venv/bin/python -m pytest -q --cov=src --cov-report=term-missing --cov-fail-under=80
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build CPU image
+        run: docker build -t asl-cnn-classifier .
+
+      - name: Run headless inference inside the container
+        run: |
+          docker run --rm asl-cnn-classifier \
+            python -m src.infer_camera --source data/sample/A/0.png --device cpu
