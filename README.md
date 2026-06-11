@@ -14,7 +14,7 @@ analysis.
 ![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white)
 ![OpenCV](https://img.shields.io/badge/OpenCV-4.x-5C3EE8?logo=opencv&logoColor=white)
-![Coverage](https://img.shields.io/badge/coverage-94%25%20(CI%20gate%20%E2%89%A580%25)-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-96%25%20(CI%20gate%20%E2%89%A580%25)-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 ---
@@ -62,9 +62,16 @@ make install
   prediction, confidence, and a rolling FPS counter.
 - **Rigorous evaluation** — 29×29 confusion matrix, per-class F1, top-10
   confused pairs, and accuracy under five synthetic distribution shifts.
+- **Explainability & calibration** — from-scratch Grad-CAM saliency overlays and
+  Expected Calibration Error (ECE) with a reliability diagram (the ECE math is
+  unit-tested against analytically known values).
+- **Production-style serving** — ONNX export with an onnxruntime↔PyTorch parity
+  test, INT8 dynamic quantization, and a FastAPI inference endpoint — alongside
+  the existing OpenCV live-camera loop.
 - **Benchmarked** — end-to-end latency (p50/p95/p99) and throughput on CPU and
-  Apple-Silicon MPS, plus a preprocessing-stage ablation.
-- **Engineered** — 94% test coverage with an 80% CI gate, a GitHub Actions CI
+  Apple-Silicon MPS, plus a preprocessing-stage ablation and a FP32-vs-ONNX-vs-INT8
+  backend comparison.
+- **Engineered** — ~96% test coverage with an 80% CI gate, a GitHub Actions CI
   matrix (Python 3.11 & 3.12) running ruff + black + a `mypy src` type-check gate
   plus a sample-train → eval → inference smoke sequence, a separate Docker job that
   builds the image and runs headless inference in-container, TensorBoard logging,
@@ -202,6 +209,38 @@ It also characterizes how accuracy degrades under five synthetic corruptions
 `artifacts/distribution_shift.json`. Low-light (brightness ×0.4) is the harshest
 shift, which mirrors real-world failure modes.
 
+## Serving, quantization & explainability
+
+Beyond the live-camera loop, the model ships with a small production-style
+toolchain. Every command below runs CPU-only on the committed sample fixture;
+all numeric outputs are written to the (git-ignored) `artifacts/` directory at
+runtime rather than hardcoded here.
+
+```bash
+make export-onnx        # → artifacts/model.onnx (dynamic batch axis)
+make quantize           # INT8 dynamic quantization → artifacts/quantization.json (real on-disk size delta)
+make benchmark-backends # FP32 vs ONNX Runtime vs INT8 latency p50/p95/p99 → artifacts/backend_benchmark.json
+make serve              # FastAPI endpoint: POST /predict (image upload), GET /health
+make gradcam            # Grad-CAM saliency overlay → artifacts/gradcam/<class>.png
+make calibration        # ECE + reliability diagram → artifacts/calibration.json
+```
+
+- **ONNX parity is a tested invariant:** `tests/test_serving.py` asserts the
+  onnxruntime logits match PyTorch within `atol=1e-4` on the same input, so the
+  export is verified numerically rather than assumed.
+- **INT8 quantization** reports the *measured* FP32-vs-INT8 on-disk size from your
+  own run (the reduction is modest because the CustomCNN is convolution-heavy and
+  eager dynamic quantization only covers its two `Linear` layers).
+- **Calibration:** the ECE computation itself is unit-tested against analytically
+  known cases (perfectly-calibrated → 0; hand-constructed bins → exact values).
+
+> **Honest caveat.** With no trained checkpoint present these tools run on a
+> random-init model over the synthetic sample fixture, so the Grad-CAM overlays,
+> ECE value, and any accuracy figures are **wiring demonstrations, not meaningful
+> results** — every script says so in its output. Train on the real dataset for
+> interpretable saliency and trustworthy calibration. The ONNX parity, size
+> delta, and latency timings are real regardless of weights.
+
 ## Common confusions
 
 ASL letters that share hand shapes are the usual error sources — **M/N/S**
@@ -220,19 +259,26 @@ and varies with lighting, skin tone, background clutter, and camera angle. See
 
 ```
 src/
-  dataset.py        # ASLDataset, stratified splits, canonical DRY transforms
-  model.py          # CustomCNN, MobileNetV2/ResNet18 transfer, build_model factory
-  train.py          # training loop: cosine LR, early stopping, TensorBoard, AMP
-  eval.py           # confusion matrix, per-class F1, distribution shift
-  infer_camera.py   # real-time OpenCV inference (ROI, FPS, snapshots)
-  benchmark.py      # latency/throughput + preprocessing ablation
-  download_data.py  # Kaggle download helper
-  utils.py          # seeding, device selection (CUDA → MPS → CPU)
-app.py              # Gradio demo app (HF Spaces entry point)
-docs/DEPLOY.md      # one-time Hugging Face Space deployment steps
-tests/              # test suite with coverage (see the Tests badge)
-configs/            # train_custom_cnn.yaml, train_mobilenet.yaml
-data/sample/        # 232 committed sample images (CI fixture)
+  dataset.py            # ASLDataset, stratified splits, canonical DRY transforms
+  model.py              # CustomCNN, MobileNetV2/ResNet18 transfer, build_model factory
+  train.py              # training loop: cosine LR, early stopping, TensorBoard, AMP
+  eval.py               # confusion matrix, per-class F1, distribution shift
+  gradcam.py            # from-scratch Grad-CAM saliency overlays
+  calibration.py        # Expected Calibration Error + reliability diagram
+  plot_per_class.py     # per-class F1 bar chart from metrics.json
+  infer_camera.py       # real-time OpenCV inference (ROI, FPS, snapshots)
+  benchmark.py          # latency/throughput + preprocessing ablation
+  benchmark_backends.py # FP32 vs ONNX vs INT8 latency/throughput comparison
+  export_onnx.py        # ONNX export (dynamic batch axis)
+  quantize.py           # INT8 dynamic quantization + on-disk size report
+  serve.py              # FastAPI inference endpoint (/predict, /health)
+  download_data.py      # Kaggle download helper
+  utils.py              # seeding, device selection (CUDA → MPS → CPU)
+app.py                  # Gradio demo app (HF Spaces entry point)
+docs/DEPLOY.md          # one-time Hugging Face Space deployment steps
+tests/                  # test suite with coverage (see the Tests badge)
+configs/                # train_custom_cnn.yaml, train_mobilenet.yaml
+data/sample/            # 232 committed sample images (CI fixture)
 ```
 
 ## Dataset
