@@ -16,6 +16,10 @@
   CPU (auto-detected).
 - **Training:** AdamW, cosine-annealing LR schedule, early stopping on
   validation loss, best-by-val-accuracy checkpointing, optional CUDA AMP.
+- **Serving formats:** native PyTorch (`.pth`), ONNX export (numerically
+  parity-tested against PyTorch within `atol=1e-4`), and an INT8 dynamically
+  quantized variant. Exposed via an OpenCV live-camera loop and a FastAPI
+  `/predict` endpoint.
 - **License:** MIT.
 
 ## Intended Use
@@ -66,6 +70,13 @@
 - **Robustness:** Accuracy is characterized under five synthetic distribution
   shifts (Gaussian blur, JPEG q20, brightness ×0.4 / ×1.8, salt-and-pepper) in
   `artifacts/distribution_shift.json`. Low-light degrades accuracy most.
+- **Calibration:** Expected Calibration Error (ECE) and a reliability diagram are
+  produced by `src/calibration.py` (`artifacts/calibration.json`). The ECE
+  computation is unit-tested against analytically known values; the reported ECE
+  is only meaningful once the model is trained on real data.
+- **Explainability:** `src/gradcam.py` produces Grad-CAM saliency overlays for
+  the predicted class. On an untrained model over the synthetic fixture these are
+  wiring demonstrations, not interpretable saliency.
 
 ## Limitations
 
