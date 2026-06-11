@@ -1,7 +1,8 @@
 """Gradio demo for the ASL Sign-Language CNN (Hugging Face Spaces entry point).
 
-Upload a cropped hand-sign image and the app returns the predicted ASL class,
-its confidence, and a bar chart of the top-5 class probabilities.
+Upload (or click a built-in example of) a cropped hand-sign image and the app
+returns the predicted ASL class, its confidence, and the top-5 class
+probabilities.
 
 The model and preprocessing are reused verbatim from the training pipeline:
 
@@ -11,14 +12,22 @@ The model and preprocessing are reused verbatim from the training pipeline:
 * :func:`src.dataset.get_eval_transforms` provides the exact eval-time
   resize/normalize pipeline, so there is no second copy of preprocessing here.
 
+The model, class names, transform, and device are loaded **once** into a
+module-level :data:`ModelBundle` singleton at import time, so a deployed Space
+does not reload the weights on every request. Loading is cheap and needs no
+checkpoint (the random-init fallback is fine), which keeps importing ``app`` in
+tests fast and CI-safe.
+
 The :func:`predict` function is deliberately factored to be importable and
-callable **without launching the server** (see ``tests/test_app.py``); only the
+callable **without launching the server** (see ``tests/test_app.py``); likewise
+:func:`build_demo` constructs the UI without launching. Only the
 ``demo.launch()`` call is guarded behind ``if __name__ == "__main__"``.
 """
 
 from __future__ import annotations
 
-from functools import lru_cache
+from dataclasses import dataclass
+from pathlib import Path
 
 import torch
 from PIL import Image
@@ -30,30 +39,96 @@ from src.utils import get_device
 # Number of class probabilities to surface in the UI / return value.
 TOP_K = 5
 
+# Link back to the source repository, surfaced in the UI description.
+REPO_URL = "https://github.com/billdmar/asl-cnn-classifier"
 
-@lru_cache(maxsize=1)
-def _load() -> tuple[torch.nn.Module, list[str], object, torch.device]:
-    """Load (and cache) the model, class names, transform, and device.
+# Classes used to wire up click-to-try examples. Chosen to be visually
+# distinct hand shapes (open palm, fist, fingers extended, etc.) so a visitor
+# can sample a spread of signs without uploading anything.
+EXAMPLE_CLASSES = ("A", "C", "L", "W", "Y", "space")
 
-    Cached so the checkpoint is loaded once per process rather than on every
-    prediction. The demo runs CPU-only on Hugging Face Spaces' free tier.
+
+@dataclass(frozen=True)
+class ModelBundle:
+    """Everything needed to run a prediction, loaded once and shared.
+
+    Attributes:
+        model: The CNN in eval mode on :attr:`device`.
+        class_names: Index→label mapping for the model outputs.
+        transform: The canonical eval-time preprocessing pipeline.
+        device: The compute device (CPU on the HF Spaces free tier).
+        val_accuracy: The checkpoint's recorded validation accuracy in
+            ``[0, 1]`` if a trained checkpoint was loaded, else ``None``.
+        trained: ``True`` if a real checkpoint was loaded, ``False`` if the
+            untrained random-init fallback is in use.
+    """
+
+    model: torch.nn.Module
+    class_names: list[str]
+    transform: object
+    device: torch.device
+    val_accuracy: float | None
+    trained: bool
+
+
+def _read_val_accuracy(path: str | Path) -> float | None:
+    """Best-effort read of ``val_accuracy`` from a checkpoint, else ``None``.
+
+    Reads the checkpoint metadata without disturbing
+    :func:`src.infer_camera.load_checkpoint` (which owns model construction).
+    Any failure (missing file, unreadable archive, absent key, wrong type)
+    yields ``None`` so the UI degrades gracefully.
+    """
+    path = Path(path)
+    if not path.exists():
+        return None
+    try:
+        checkpoint = torch.load(path, map_location="cpu", weights_only=False)
+    except Exception:  # noqa: BLE001 - any load failure → unknown accuracy.
+        return None
+    val_acc = checkpoint.get("val_accuracy") if isinstance(checkpoint, dict) else None
+    return float(val_acc) if isinstance(val_acc, (int, float)) else None
+
+
+def _build_bundle() -> ModelBundle:
+    """Load the model, class names, transform, and device exactly once.
+
+    The demo runs CPU-only on Hugging Face Spaces' free tier. When no checkpoint
+    is present, :func:`load_checkpoint` returns an untrained random-init model;
+    we record that in :attr:`ModelBundle.trained` so the UI can be honest.
     """
     device = get_device("cpu")
     model, class_names = load_checkpoint(DEFAULT_CHECKPOINT, device)
     transform = get_eval_transforms()
-    return model, class_names, transform, device
+    trained = Path(DEFAULT_CHECKPOINT).exists()
+    val_accuracy = _read_val_accuracy(DEFAULT_CHECKPOINT) if trained else None
+    return ModelBundle(
+        model=model,
+        class_names=class_names,
+        transform=transform,
+        device=device,
+        val_accuracy=val_accuracy,
+        trained=trained,
+    )
+
+
+# Module-level singleton: built once at import, reused for every prediction.
+MODEL: ModelBundle = _build_bundle()
+
+
+def get_model() -> ModelBundle:
+    """Return the shared :data:`ModelBundle` singleton (loaded once at import)."""
+    return MODEL
 
 
 def is_using_trained_checkpoint() -> bool:
-    """Return True if a real checkpoint was found (not the random-init fallback).
+    """Return True if a real checkpoint was loaded (not the random-init fallback).
 
-    Used to drive the honesty banner in the UI: when no checkpoint exists,
-    ``load_checkpoint`` falls back to untrained random weights and predictions
-    are meaningless.
+    Drives the honesty banner in the UI: when no checkpoint exists,
+    :func:`load_checkpoint` falls back to untrained random weights and
+    predictions are meaningless.
     """
-    from pathlib import Path
-
-    return Path(DEFAULT_CHECKPOINT).exists()
+    return get_model().trained
 
 
 @torch.no_grad()
@@ -62,7 +137,8 @@ def predict(image: Image.Image) -> tuple[dict[str, float], str]:
 
     Applies the canonical eval transform, runs a forward pass, and softmaxes the
     logits. This is the headless prediction entry point — it performs no Gradio
-    or server calls, so it can be unit-tested directly.
+    or server calls, so it can be unit-tested directly. It uses the shared
+    module-level model singleton (no per-call weight loading).
 
     Args:
         image: An RGB (or convertible) ``PIL.Image``.
@@ -74,69 +150,121 @@ def predict(image: Image.Image) -> tuple[dict[str, float], str]:
         best class and its confidence.
 
     Raises:
-        ValueError: If ``image`` is ``None``.
+        ValueError: If ``image`` is ``None`` or is not a usable image.
     """
     if image is None:
-        raise ValueError("No image provided.")
+        raise ValueError("No image provided. Upload or pick an example image.")
+    if not isinstance(image, Image.Image):
+        raise ValueError(
+            "Expected an image; received "
+            f"{type(image).__name__}. Upload or pick an example image."
+        )
 
-    model, class_names, transform, device = _load()
-    pil = image.convert("RGB")
-    tensor = transform(pil).unsqueeze(0).to(device)
-    logits = model(tensor)
+    bundle = get_model()
+    try:
+        pil = image.convert("RGB")
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"Could not read the provided image: {exc}") from exc
+
+    tensor = bundle.transform(pil).unsqueeze(0).to(bundle.device)
+    logits = bundle.model(tensor)
     probs = torch.softmax(logits, dim=1).squeeze(0)
 
     k = min(TOP_K, probs.numel())
     top_vals, top_idx = torch.topk(probs, k)
-    top_probs = {class_names[int(i)]: float(v) for v, i in zip(top_vals, top_idx)}
+    top_probs = {
+        bundle.class_names[int(i)]: float(v) for v, i in zip(top_vals, top_idx)
+    }
 
-    best_label = class_names[int(top_idx[0])]
+    best_label = bundle.class_names[int(top_idx[0])]
     best_conf = float(top_vals[0])
     summary = f"Predicted: {best_label}  ({best_conf * 100:.1f}% confidence)"
     return top_probs, summary
 
 
-_TRAINED = is_using_trained_checkpoint()
-_BANNER = (
-    "### ASL Sign-Language CNN — demo\n"
-    "Upload a cropped image of a single static ASL hand sign (A–Z, plus "
-    "*space* / *del* / *nothing*). The model predicts the class and shows the "
-    "top-5 probabilities.\n\n"
-    + (
-        "> Predictions reflect the **loaded trained checkpoint**."
-        if _TRAINED
-        else "> **No trained checkpoint is loaded**, so this Space is running an "
-        "**untrained, random-init** model and its predictions are "
-        "**meaningless** — they only demonstrate the wiring. Train a model "
-        "(`make train`) and add `best_model.pth` to produce real results. See "
-        "the README's accuracy note and `MODEL_CARD.md`."
+def _banner_markdown(bundle: ModelBundle) -> str:
+    """Build the title + honest status banner for the given model bundle."""
+    header = (
+        "# ASL Sign-Language CNN — demo\n"
+        "Classify a cropped image of a single static American Sign Language hand "
+        "sign (A–Z, plus *space* / *del* / *nothing*). Upload your own crop or "
+        "click an example below; the model returns the predicted class and the "
+        f"top-{TOP_K} probabilities. "
+        f"Source, training code, and model card: [{REPO_URL}]({REPO_URL}).\n\n"
     )
-)
+    if bundle.trained:
+        if bundle.val_accuracy is not None:
+            status = (
+                "> A **trained checkpoint is loaded** "
+                f"(reported validation accuracy: **{bundle.val_accuracy * 100:.2f}%**). "
+                "Predictions reflect that trained model."
+            )
+        else:
+            status = (
+                "> A **trained checkpoint is loaded**; predictions reflect that "
+                "trained model. (No validation accuracy was recorded in the "
+                "checkpoint.)"
+            )
+    else:
+        status = (
+            "> **No trained checkpoint is loaded.** This Space is running an "
+            "**untrained, random-init** model — its predictions are "
+            "**meaningless** and demonstrate the wiring only. Train a model "
+            "(`make train`) and add `best_model.pth` to produce real results. "
+            "See the README's accuracy note and `MODEL_CARD.md`."
+        )
+    return header + status
+
+
+def _example_paths() -> list[list[str]]:
+    """Return Gradio ``Examples`` rows for the example classes that exist on disk.
+
+    Each row is a single-element list ``[path]`` matching the single image
+    input. Missing sample files are skipped so the UI never references a path
+    that would 404 on a slimmed-down deployment.
+    """
+    rows: list[list[str]] = []
+    for cls in EXAMPLE_CLASSES:
+        path = Path("data/sample") / cls / "0.png"
+        if path.exists():
+            rows.append([str(path)])
+    return rows
 
 
 def build_demo():
-    """Construct the Gradio Blocks UI. Imported lazily to keep tests headless."""
+    """Construct the Gradio Blocks UI (no server launch).
+
+    Imported lazily so the heavy Gradio import is not paid by headless tests
+    that only exercise :func:`predict`.
+    """
     import gradio as gr
 
+    bundle = get_model()
     with gr.Blocks(title="ASL Sign-Language CNN") as demo:
-        gr.Markdown(_BANNER)
+        gr.Markdown(_banner_markdown(bundle))
         with gr.Row():
             with gr.Column():
                 image_in = gr.Image(type="pil", label="Hand-sign image")
                 submit = gr.Button("Classify", variant="primary")
-                gr.Examples(
-                    examples=[
-                        ["data/sample/A/0.png"],
-                        ["data/sample/B/0.png"],
-                        ["data/sample/C/0.png"],
-                    ],
-                    inputs=image_in,
-                )
+                examples = _example_paths()
+                if examples:
+                    gr.Examples(
+                        examples=examples,
+                        inputs=image_in,
+                        label="Examples (click to try)",
+                    )
             with gr.Column():
                 summary_out = gr.Textbox(label="Prediction", interactive=False)
-                label_out = gr.Label(num_top_classes=TOP_K, label="Top-5 probabilities")
+                label_out = gr.Label(
+                    num_top_classes=TOP_K, label=f"Top-{TOP_K} probabilities"
+                )
 
         def _ui_predict(img):
-            top_probs, summary = predict(img)
+            """Gradio callback: surface prediction errors as a UI message."""
+            try:
+                top_probs, summary = predict(img)
+            except ValueError as exc:
+                return str(exc), {}
             return summary, top_probs
 
         submit.click(_ui_predict, inputs=image_in, outputs=[summary_out, label_out])
