@@ -274,4 +274,11 @@ def build_demo():
 
 
 if __name__ == "__main__":
-    build_demo().launch()
+    import os
+
+    # Bind to 0.0.0.0 so the app is reachable inside a container / on Hugging
+    # Face Spaces (the default 127.0.0.1 is not accessible there, which makes
+    # Gradio raise "a shareable link must be created"). Spaces sets the port via
+    # the PORT env var; fall back to Gradio's default 7860 locally.
+    port = int(os.environ.get("PORT", os.environ.get("GRADIO_SERVER_PORT", 7860)))
+    build_demo().launch(server_name="0.0.0.0", server_port=port)
