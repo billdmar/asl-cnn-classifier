@@ -25,14 +25,19 @@ A [Gradio](https://gradio.app) app (`app.py`) lets you upload a hand-sign image
 and see the predicted class plus top-5 probabilities. It is built to deploy on
 Hugging Face Spaces.
 
+![ASL CNN Gradio demo](docs/demo.png)
+
+*The app running locally on the committed sample fixture. The banner honestly
+reports the loaded checkpoint's validation accuracy — here a sample-trained
+model, so predictions are near-uniform; train on the real dataset for meaningful
+output.*
+
 > **Not yet deployed.** No live Space exists yet — see
-> [`docs/DEPLOY.md`](docs/DEPLOY.md) for the one-time push steps. Once deployed,
-> the URL goes here:
+> [`docs/DEPLOY.md`](docs/DEPLOY.md) for the one-time push steps (`make deploy-hf`
+> with an `HF_TOKEN`). Once deployed, the live URL goes here:
 >
 > <!-- TODO: paste your Hugging Face Space URL here after deploying, e.g.
 >      [Try it on Hugging Face Spaces](https://huggingface.co/spaces/<you>/asl-cnn-classifier) -->
->
-> <!-- TODO: add a demo GIF/screenshot here, e.g. ![demo](docs/demo.gif) -->
 
 Run it locally:
 
