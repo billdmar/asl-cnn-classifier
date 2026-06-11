@@ -3,7 +3,10 @@
 
 PY := .venv/bin/python
 
-.PHONY: install sample-train train eval gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test clean
+.PHONY: install sample-train train eval gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
+
+# Target Hugging Face Space, e.g. `export HF_SPACE=you/asl-cnn-classifier`.
+HF_SPACE ?=
 
 # Create the venv, install dev deps, and regenerate the committed sample data.
 install:
@@ -85,6 +88,16 @@ docker-run:
 
 # Build the image, then run in-container inference end-to-end.
 docker-test: docker-build docker-run
+
+# Deploy the Gradio demo to a Hugging Face Space (idempotent — safe to re-run).
+# Requires HF_TOKEN (write scope) in the environment and HF_SPACE=<user>/<space>.
+# Get a token at https://huggingface.co/settings/tokens. See docs/DEPLOY.md.
+deploy-hf:
+	$(PY) scripts/deploy_hf.py --space-id $(HF_SPACE) --sdk gradio
+
+# Preview what WOULD be uploaded and the resolved Space URL — no token, no network.
+deploy-hf-dryrun:
+	$(PY) scripts/deploy_hf.py --space-id $(HF_SPACE) --sdk gradio --dry-run
 
 # Remove generated artifacts (keeping .gitkeep) and bytecode caches.
 clean:
