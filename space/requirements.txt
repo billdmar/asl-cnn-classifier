@@ -1,0 +1,20 @@
+# Hugging Face Space requirements (CPU-only, free-tier hardware).
+#
+# This file is uploaded to the Space *as* its `requirements.txt` by
+# `scripts/deploy_hf.py`. HF Spaces installs CPU PyTorch wheels by default, so we
+# pin the same major versions as the repo's core stack but keep the list minimal
+# — only what `app.py` and the `src/` inference path actually need at runtime.
+#
+# Kept self-contained (no `-r` indirection) because the Space does not ship the
+# rest of the repo's requirements files. See docs/DEPLOY.md.
+gradio>=4.0,<6.0
+torch>=2.2,<3.0
+torchvision>=0.17,<1.0
+pillow>=10.0,<12.0
+numpy>=1.26,<2.2
+PyYAML>=6.0,<7.0
+# Imported transitively at app import time: src.infer_camera imports cv2 and
+# src.dataset imports scikit-learn, so the Space needs both to boot. Headless
+# OpenCV avoids GUI/X11 system libraries that aren't present on Spaces.
+opencv-python-headless>=4.8,<5.0
+scikit-learn>=1.3,<2.0
