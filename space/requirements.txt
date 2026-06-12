@@ -7,7 +7,10 @@
 #
 # Kept self-contained (no `-r` indirection) because the Space does not ship the
 # rest of the repo's requirements files. See docs/DEPLOY.md.
-gradio>=4.0,<6.0
+# Gradio 5.x: compatible with huggingface_hub 1.x and modern starlette/fastapi.
+# (Gradio 4.44 broke on Spaces: it imports the removed `HfFolder`, and its
+# pinned starlette raised "argument of type 'bool' is not iterable" on boot.)
+gradio>=5.49,<6.0
 torch>=2.2,<3.0
 torchvision>=0.17,<1.0
 pillow>=10.0,<12.0
