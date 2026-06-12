@@ -49,10 +49,23 @@ ALLOW_PATTERNS: list[str] = [
 # Patterns never uploaded, even if matched above or added later. Keeps the Space
 # lean and avoids shipping the venv, git internals, caches, tests, or large
 # regenerated artifacts.
+#
+# NOTE: ``artifacts/`` is excluded, but the trained checkpoint lives under it and
+# IS shipped when present. In ``huggingface_hub.upload_folder`` an
+# ``ignore_patterns`` match always wins over ``allow_patterns``, so a blanket
+# ``artifacts/**`` ignore would silently drop the checkpoint even though it is in
+# ``allow_patterns``. We therefore exclude the artifacts subdirectories
+# individually and leave ``artifacts/checkpoints/`` shippable.
 IGNORE_PATTERNS: list[str] = [
     ".venv/**",
     ".git/**",
-    "artifacts/**",
+    "artifacts/runs/**",
+    "artifacts/camera_snapshots/**",
+    "artifacts/gradcam/**",
+    "artifacts/*.png",
+    "artifacts/*.json",
+    "artifacts/*.txt",
+    "artifacts/*.onnx",
     "**/__pycache__/**",
     "*.pyc",
     "tests/**",

@@ -31,6 +31,12 @@ That's it. The command prints the Space URL
 (`https://huggingface.co/spaces/<user>/asl-cnn-classifier`); the Space builds
 and starts automatically (first build takes a few minutes — PyTorch is large).
 
+> **Python version matters.** `space/README.md` pins `python_version: "3.11"`.
+> Do not remove it: on Python 3.13 the stdlib `audioop` module was removed
+> (PEP 594), which breaks Gradio's transitive `pydub` import at startup
+> (`ModuleNotFoundError: No module named 'pyaudioop'`) and the Space fails with a
+> `RUNTIME_ERROR`. 3.11 matches the repo's own target and CI matrix.
+
 The deploy is **idempotent**: `create_repo` runs with `exist_ok=True` and the
 upload overwrites changed files, so re-running just re-syncs the latest state.
 

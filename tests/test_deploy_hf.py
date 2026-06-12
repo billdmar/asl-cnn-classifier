@@ -104,7 +104,10 @@ def test_planned_uploads_is_sorted_and_unique():
     [
         ".venv/lib/python3.12/site-packages/foo.py",
         ".git/config",
-        "artifacts/checkpoints/best_model.pth",
+        "artifacts/runs/events.out.tfevents",
+        "artifacts/confusion_matrix.png",
+        "artifacts/metrics.json",
+        "artifacts/model.onnx",
         "src/__pycache__/model.cpython-312.pyc",
         "tests/test_app.py",
         ".github/workflows/ci.yml",
@@ -117,6 +120,14 @@ def test_is_ignored_matches_noise(path):
 @pytest.mark.parametrize("path", ["app.py", "src/model.py", "configs/x.yaml"])
 def test_is_ignored_keeps_real_files(path):
     assert deploy_hf._is_ignored(path) is False
+
+
+def test_checkpoint_is_not_ignored():
+    # Regression: the trained checkpoint lives under artifacts/ but must remain
+    # shippable. A blanket "artifacts/**" ignore previously dropped it from the
+    # real upload_folder call (ignore beats allow), even though planned_uploads
+    # listed it — so the Space silently shipped without a checkpoint.
+    assert deploy_hf._is_ignored(deploy_hf.CHECKPOINT_REL) is False
 
 
 def test_checkpoint_included_when_present(tmp_path):
