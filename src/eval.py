@@ -6,8 +6,9 @@ writes the full evaluation artifact set:
 
 * ``artifacts/metrics.json`` — overall accuracy, macro precision/recall/F1,
   per-class metrics, and the most-confused class pairs.
-* ``artifacts/confusion_matrix.png`` — a 29×29 seaborn heatmap with all class
-  labels shown (even classes absent from the tiny sample test set).
+* ``artifacts/confusion_matrix.png`` — an ``N×N`` seaborn heatmap (``N`` = the
+  number of classes) with all class labels shown (even classes absent from the
+  tiny sample test set).
 * ``artifacts/per_class_errors.txt`` — the top-10 most-confused class pairs.
 
 Preprocessing reuses :func:`src.dataset.get_eval_transforms` and checkpoint
@@ -53,7 +54,6 @@ from src.utils import get_device, save_json, set_seed  # noqa: E402
 
 DEFAULT_CHECKPOINT = "artifacts/checkpoints/best_model.pth"
 ARTIFACTS = Path("artifacts")
-NUM_CLASSES = 29
 
 SAMPLE_DATA_NOTE = (
     "Accuracy on the tiny data/sample fixture is a wiring sanity check, not a "
@@ -119,7 +119,7 @@ def most_confused_pairs(
 
 
 def save_confusion_matrix(cm: np.ndarray, class_names: list[str], path: Path) -> None:
-    """Save a 29×29 seaborn heatmap with every class label legible."""
+    """Save an ``N×N`` seaborn heatmap with every class label legible."""
     fig, ax = plt.subplots(figsize=(16, 14))
     sns.heatmap(
         cm,
@@ -286,7 +286,10 @@ def main() -> int:
 
     y_true, y_pred = run_inference(model, test_loader, device)
 
-    labels = list(range(NUM_CLASSES))
+    # Derive the label set from the actual class names (works for 26, 29, or any
+    # count) instead of a hardcoded constant, so classification_report and
+    # confusion_matrix never mismatch the model's output dimension.
+    labels = list(range(len(class_names)))
     if y_true.size > 0:
         overall_accuracy = float((y_true == y_pred).mean())
     else:

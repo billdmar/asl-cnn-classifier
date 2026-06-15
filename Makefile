@@ -3,7 +3,7 @@
 
 PY := .venv/bin/python
 
-.PHONY: install sample-train train eval gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
+.PHONY: install download-real sample-train train eval gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
 
 # Target Hugging Face Space, e.g. `export HF_SPACE=you/asl-cnn-classifier`.
 HF_SPACE ?=
@@ -13,6 +13,11 @@ install:
 	uv venv --python 3.12
 	uv pip install -r requirements-dev.txt
 	$(PY) -m src.make_sample_data
+
+# Download the real 26-class ASL dataset from the public HF Hub (no credentials)
+# into data/asl_real/<CLASS>/<i>.png. Add --max_per_class N for a fast subset.
+download-real:
+	$(PY) -m src.download_hf_data --out_dir data/asl_real
 
 # Quick end-to-end smoke train on the tiny committed sample set (CPU, 2 epochs).
 sample-train:
