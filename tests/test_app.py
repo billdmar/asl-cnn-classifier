@@ -10,6 +10,7 @@ output (valid labels, a probability distribution), never on accuracy.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 import torch
@@ -114,6 +115,66 @@ def test_example_paths_exist_and_are_distinct():
         assert os.path.exists(_repo_path(path))
         assert path not in seen
         seen.add(path)
+
+
+def test_example_paths_prefer_real_over_sample(tmp_path, monkeypatch):
+    # When docs/examples holds real PNGs, _example_paths() must surface those
+    # and ignore the synthetic data/sample fixtures entirely.
+    real_dir = tmp_path / "docs_examples"
+    real_dir.mkdir()
+    sample_dir = tmp_path / "data_sample"
+    (sample_dir / "A").mkdir(parents=True)
+    Image.new("RGB", (8, 8)).save(sample_dir / "A" / "0.png")
+
+    for letter in ("A", "C", "L"):
+        Image.new("RGB", (8, 8)).save(real_dir / f"{letter}.png")
+
+    monkeypatch.setattr(app, "REAL_EXAMPLES_DIR", real_dir)
+    monkeypatch.setattr(app, "SAMPLE_DIR", sample_dir)
+
+    rows = app._example_paths()
+    paths = [row[0] for row in rows]
+    # Exactly the real examples, sorted, none from the sample fixtures.
+    assert paths == [str(real_dir / f"{c}.png") for c in ("A", "C", "L")]
+    assert all(str(sample_dir) not in p for p in paths)
+
+
+def test_example_paths_fall_back_to_sample_when_no_real(tmp_path, monkeypatch):
+    # With no real examples (empty or missing dir), _example_paths() falls back
+    # to the data/sample <CLASS>/0.png fixtures.
+    real_dir = tmp_path / "docs_examples"  # intentionally NOT created
+    sample_dir = tmp_path / "data_sample"
+    (sample_dir / "A").mkdir(parents=True)
+    (sample_dir / "C").mkdir(parents=True)
+    Image.new("RGB", (8, 8)).save(sample_dir / "A" / "0.png")
+    Image.new("RGB", (8, 8)).save(sample_dir / "C" / "0.png")
+
+    monkeypatch.setattr(app, "REAL_EXAMPLES_DIR", real_dir)
+    monkeypatch.setattr(app, "SAMPLE_DIR", sample_dir)
+    monkeypatch.setattr(app, "EXAMPLE_CLASSES", ("A", "C", "Z"))
+
+    rows = app._example_paths()
+    paths = [row[0] for row in rows]
+    # Z has no fixture and is skipped; A and C resolve to their sample fixtures.
+    assert paths == [
+        str(sample_dir / "A" / "0.png"),
+        str(sample_dir / "C" / "0.png"),
+    ]
+
+    # An empty (but present) real dir also triggers the fallback.
+    real_dir.mkdir()
+    assert [row[0] for row in app._example_paths()] == paths
+
+
+def test_real_examples_dir_holds_real_images():
+    # The committed docs/examples should contain the real ASL hand photos that
+    # back the live demo (this asserts they exist and are readable images).
+    real_dir = Path(_repo_path("docs/examples"))
+    pngs = sorted(real_dir.glob("*.png"))
+    assert pngs, "expected committed real example images in docs/examples"
+    for png in pngs:
+        with Image.open(png) as img:
+            assert img.size[0] > 0 and img.size[1] > 0
 
 
 def test_banner_is_honest_about_untrained_model():

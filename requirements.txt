@@ -20,3 +20,7 @@ python-multipart>=0.0.9,<1.0
 
 # Optional: dataset download from Kaggle (needs ~/.kaggle/kaggle.json).
 kaggle>=1.6,<2.0
+
+# Real dataset ingestion from the public Hugging Face Hub (no credentials).
+# See src/download_hf_data.py.
+datasets>=2.19,<4.0

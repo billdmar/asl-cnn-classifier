@@ -28,11 +28,10 @@ and see the predicted class plus top-5 probabilities.
 
 ![ASL CNN Gradio demo](docs/demo.png)
 
-*The live app. The banner honestly reports the loaded checkpoint's validation
-accuracy — currently a **sample-trained** model (val ≈ 2.86%), so predictions
-are near-uniform by design; train on the full dataset for meaningful output. The
-Space loads `best_model.pth` from the repo, so re-deploying after a real
-training run upgrades it in place.*
+*The live app, running the real MobileNetV2 model (val ≈ 97.8%, held-out test
+96.8% across A–Z). Upload a cropped hand-sign image or click an example and it
+returns the predicted letter with top-5 probabilities. The screenshot predates
+the trained model; the banner reflects whichever checkpoint is currently loaded.*
 
 > Deployed with one command — `make deploy-hf` (see
 > [`docs/DEPLOY.md`](docs/DEPLOY.md)).
@@ -82,18 +81,22 @@ make install
 
 ## Results
 
-> **Accuracy status — read this.** The headline **≥98% test accuracy** is the
-> target on the full ~87k-image Kaggle ASL Alphabet dataset and is reproduced
-> with `make train` once the dataset is downloaded (see
-> [Reproducing 98%](#reproducing-the-98-accuracy-target)). It is **not** yet
-> reproduced in this checkout. Every number below that *is* measured on this
-> machine is labeled as such; the tiny committed sample subset is a wiring
-> sanity-check, not a meaningful accuracy.
+> **Accuracy status — read this.** The headline number below is **real and
+> reproduced**: a MobileNetV2 transfer model was trained on a real ASL hand-sign
+> dataset ([`Marxulia/asl_sign_languages_alphabets_v03`](https://huggingface.co/datasets/Marxulia/asl_sign_languages_alphabets_v03),
+> 26 classes A–Z, ~10.9k images, downloadable with `make download-real` — **no
+> Kaggle account needed**) and scored on its held-out test split. Reproduce with
+> `make download-real && make train-real && make eval-real` (~35 min on
+> Apple-Silicon MPS). The original ≥98% figure on the 29-class Kaggle dataset
+> remains an aspirational target (that dataset also includes *space/del/nothing*);
+> this 26-letter result is what is actually demonstrated here.
 
 | Metric | Value | Source |
 | --- | --- | --- |
-| Test accuracy — MobileNetV2, full dataset | **≥98% (target)** | reproduce via `make train` |
-| Test accuracy — custom CNN, full dataset | ~95–98% (target) | reproduce via `make train` |
+| **Test accuracy — MobileNetV2, real ASL dataset (26 classes, held-out test)** | **96.8%** | **measured** (`make eval-real`, 1,631 test images) |
+| Macro F1 — same | **0.968** | measured |
+| Validation accuracy (best epoch) | **97.8%** | measured during `make train-real` |
+| Test accuracy — MobileNetV2, full 29-class Kaggle set | ≥98% (target) | aspirational |
 | Custom-CNN parameters | **656,829** | measured (`tests/test_model.py` asserts this) |
 | CPU inference latency (mean) | **5.08 ms/frame** | measured, this machine |
 | CPU throughput | **197 FPS** | measured, this machine |

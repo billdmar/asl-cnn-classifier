@@ -47,6 +47,15 @@ REPO_URL = "https://github.com/billdmar/asl-cnn-classifier"
 # can sample a spread of signs without uploading anything.
 EXAMPLE_CLASSES = ("A", "C", "L", "W", "Y", "space")
 
+# Directory of committed, *real* ASL hand-photo examples (``<CLASS>.png``),
+# preferred over the synthetic ``data/sample`` fixtures when present. Populate it
+# with ``scripts/extract_examples.py`` from a real class-folder dataset.
+REAL_EXAMPLES_DIR = Path("docs/examples")
+
+# Synthetic fallback fixtures (colored squares) committed for CI; used only when
+# no real examples are available so the demo still has clickable examples.
+SAMPLE_DIR = Path("data/sample")
+
 
 @dataclass(frozen=True)
 class ModelBundle:
@@ -216,19 +225,44 @@ def _banner_markdown(bundle: ModelBundle) -> str:
     return header + status
 
 
-def _example_paths() -> list[list[str]]:
-    """Return Gradio ``Examples`` rows for the example classes that exist on disk.
+def _real_example_paths() -> list[list[str]]:
+    """Return ``Examples`` rows for the real hand-photo examples on disk.
 
-    Each row is a single-element list ``[path]`` matching the single image
-    input. Missing sample files are skipped so the UI never references a path
-    that would 404 on a slimmed-down deployment.
+    Reads every ``*.png`` in :data:`REAL_EXAMPLES_DIR` (sorted for a stable
+    order). Returns an empty list when the directory is absent or holds no PNGs,
+    so the caller can fall back to the synthetic fixtures.
+    """
+    if not REAL_EXAMPLES_DIR.is_dir():
+        return []
+    return [[str(p)] for p in sorted(REAL_EXAMPLES_DIR.glob("*.png"))]
+
+
+def _sample_example_paths() -> list[list[str]]:
+    """Return ``Examples`` rows for the synthetic ``data/sample`` fixtures.
+
+    One row per class in :data:`EXAMPLE_CLASSES` whose ``0.png`` fixture exists;
+    missing files are skipped so the UI never references a path that would 404.
     """
     rows: list[list[str]] = []
     for cls in EXAMPLE_CLASSES:
-        path = Path("data/sample") / cls / "0.png"
+        path = SAMPLE_DIR / cls / "0.png"
         if path.exists():
             rows.append([str(path)])
     return rows
+
+
+def _example_paths() -> list[list[str]]:
+    """Return Gradio ``Examples`` rows, preferring real images over fixtures.
+
+    Each row is a single-element list ``[path]`` matching the single image
+    input. Real ASL hand photos committed under :data:`REAL_EXAMPLES_DIR` are
+    used when present; otherwise the demo falls back to the synthetic
+    ``data/sample`` colored-square fixtures so it always has clickable examples.
+    """
+    real = _real_example_paths()
+    if real:
+        return real
+    return _sample_example_paths()
 
 
 def build_demo():

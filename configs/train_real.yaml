@@ -1,0 +1,38 @@
+# Training configuration — custom from-scratch CNN on the REAL HF dataset.
+# Materialize the data first with `make download-real` (or
+# `python -m src.download_hf_data --out_dir data/asl_real`), which writes the
+# public `Marxulia/asl_sign_languages_alphabets_v03` dataset (26 classes, A-Z)
+# into data/asl_real/<CLASS>/<i>.png.
+# CLI flags (see src/train.py) override any value here.
+
+# Data
+data_dir: data/asl_real   # 26-class A-Z layout from src.download_hf_data
+image_size: 128
+train_frac: 0.70
+val_frac: 0.15
+test_frac: 0.15
+
+# Model
+arch: custom_cnn          # custom_cnn | mobilenet_v2 | resnet18
+num_classes: 26           # A-Z (no del/nothing/space) — class_names derive from data dir
+pretrained: false
+
+# Optimization
+batch_size: 64
+num_epochs: 15
+learning_rate: 0.001
+weight_decay: 0.0001
+optimizer: adamw          # adamw | sgd
+lr_scheduler: cosine      # cosine | plateau
+warmup_epochs: 0          # only used by transfer-learning configs
+
+# Training behavior
+seed: 42
+num_workers: 4
+amp: false                # auto-disabled on non-CUDA devices
+early_stopping_patience: 10
+device: auto              # auto | cpu | cuda | mps
+
+# Output
+checkpoint_dir: artifacts/checkpoints
+tensorboard_dir: artifacts/runs
