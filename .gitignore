@@ -33,3 +33,6 @@ data/*
 .idea/
 .vscode/
 *.swp
+
+# ─── Agent / tooling scratch ────────────────────────────────
+.claude/

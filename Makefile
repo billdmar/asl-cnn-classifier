@@ -3,7 +3,7 @@
 
 PY := .venv/bin/python
 
-.PHONY: install download-real sample-train train eval gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
+.PHONY: install download-real sample-train train train-real eval eval-real gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
 
 # Target Hugging Face Space, e.g. `export HF_SPACE=you/asl-cnn-classifier`.
 HF_SPACE ?=
@@ -27,9 +27,18 @@ sample-train:
 train:
 	$(PY) -m src.train --config configs/train_custom_cnn.yaml
 
+# Train the MobileNetV2 transfer model on the real ASL dataset (run
+# `make download-real` first). ~35 min on Apple-Silicon MPS; reaches ~98% val.
+train-real:
+	$(PY) -m src.train --config configs/train_real_mobilenet.yaml
+
 # Evaluate a trained checkpoint (uses sample data here for a fast check).
 eval:
 	$(PY) -m src.eval --config configs/train_custom_cnn.yaml --checkpoint artifacts/checkpoints/best_model.pth --data_dir data/sample
+
+# Evaluate the real-data checkpoint on the held-out real test split.
+eval-real:
+	$(PY) -m src.eval --checkpoint artifacts/checkpoints/best_model.pth --data_dir data/asl_real
 
 # Grad-CAM explainability overlay for a single image (uses sample data here).
 gradcam:

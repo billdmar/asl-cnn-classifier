@@ -60,6 +60,19 @@ SAMPLE_DATA_NOTE = (
     "meaningful measure of model quality. Train on the full ASL Alphabet "
     "dataset for real numbers."
 )
+REAL_DATA_NOTE = (
+    "Accuracy measured on the held-out test split of a real ASL hand-sign "
+    "dataset (never seen during training or validation)."
+)
+
+
+def _accuracy_note(data_dir: str) -> str:
+    """Pick an honest provenance note based on the dataset being evaluated.
+
+    The synthetic ``data/sample`` fixture is a wiring sanity check; any other
+    directory is treated as real data and gets the held-out-test note.
+    """
+    return SAMPLE_DATA_NOTE if "sample" in str(data_dir) else REAL_DATA_NOTE
 
 
 @torch.no_grad()
@@ -334,7 +347,7 @@ def main() -> int:
         "most_confused_pairs": confused,
         "num_test_samples": int(y_true.size),
         "checkpoint": str(args.checkpoint),
-        "note": SAMPLE_DATA_NOTE,
+        "note": _accuracy_note(args.data_dir),
     }
 
     if args.distribution_shift:
@@ -363,7 +376,7 @@ def main() -> int:
     print(f"\nSaved metrics to            {metrics_path}")
     print(f"Saved confusion matrix to   {cm_path}")
     print(f"Saved per-class errors to   {errors_path}")
-    print(f"\nNOTE: {SAMPLE_DATA_NOTE}")
+    print(f"\nNOTE: {_accuracy_note(args.data_dir)}")
     return 0
 
 
