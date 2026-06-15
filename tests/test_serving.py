@@ -145,7 +145,9 @@ def test_health_endpoint():
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "ok"
-    assert body["num_classes"] == 29
+    # Class count reflects the loaded checkpoint (29 for the random-init/sample
+    # fallback, 26 for the real A–Z model), not a hardcoded constant.
+    assert body["num_classes"] == len(serve._CLASS_NAMES)
 
 
 def test_predict_endpoint():
