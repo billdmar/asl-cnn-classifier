@@ -32,8 +32,68 @@ export interface InferenceResult {
 }
 
 const DEFAULT_MODEL_URL = "/model/model.onnx";
+const CALIBRATION_URL = "/model/calibration.json";
+
+/** Identity temperature — applying it before softmax is a no-op (current ship). */
+export const DEFAULT_TEMPERATURE = 1.0;
 
 let sessionPromise: Promise<ort.InferenceSession> | null = null;
+let temperaturePromise: Promise<number> | null = null;
+
+/**
+ * Lazily fetch (once, cached) the calibration temperature from
+ * {@link CALIBRATION_URL}. SSR/static-export safe: when `fetch` is unavailable
+ * (server/build) or the file is missing/unparseable, it degrades gracefully to
+ * {@link DEFAULT_TEMPERATURE} (1.0 = identity, no behavior change).
+ *
+ * @returns A promise resolving to a positive temperature `T`.
+ */
+export function getTemperature(): Promise<number> {
+  if (!temperaturePromise) {
+    temperaturePromise =
+      typeof fetch === "undefined"
+        ? Promise.resolve(DEFAULT_TEMPERATURE)
+        : fetch(CALIBRATION_URL)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data: unknown) => {
+              const t =
+                data !== null &&
+                typeof data === "object" &&
+                "temperature" in data &&
+                typeof (data as { temperature: unknown }).temperature === "number"
+                  ? (data as { temperature: number }).temperature
+                  : DEFAULT_TEMPERATURE;
+              // Guard against bad/zero/negative values that would break softmax.
+              return Number.isFinite(t) && t > 0 ? t : DEFAULT_TEMPERATURE;
+            })
+            .catch(() => DEFAULT_TEMPERATURE);
+  }
+  return temperaturePromise;
+}
+
+/** Reset the cached temperature (used by tests). */
+export function resetTemperature(): void {
+  temperaturePromise = null;
+}
+
+/**
+ * Divide logits by the calibration temperature `T` before softmax (temperature
+ * scaling, Guo et al. 2017). With `T = 1.0` this is the identity, so it leaves
+ * the probability vector unchanged; `T > 1` softens the distribution. Pure.
+ *
+ * @param logits - Raw pre-softmax model outputs.
+ * @param temperature - Positive scalar `T`.
+ * @returns The probability vector `softmax(logits / T)`.
+ */
+export function applyTemperature(
+  logits: Float32Array,
+  temperature: number,
+): Float32Array {
+  if (temperature === 1.0) return softmax(logits);
+  const scaled = new Float32Array(logits.length);
+  for (let i = 0; i < logits.length; i++) scaled[i] = logits[i]! / temperature;
+  return softmax(scaled);
+}
 
 /**
  * Configure the onnxruntime-web WASM asset location. The package ships its
@@ -71,9 +131,10 @@ export function getSession(
   return sessionPromise;
 }
 
-/** Reset the cached session (used by tests). */
+/** Reset the cached session and temperature (used by tests). */
 export function resetSession(): void {
   sessionPromise = null;
+  temperaturePromise = null;
 }
 
 /**
@@ -82,18 +143,24 @@ export function resetSession(): void {
  * @param session - A ready ONNX session.
  * @param tensorData - Float32Array of length `3 * size * size` (no batch dim).
  * @param size - The spatial side length the tensor encodes.
+ * @param temperature - Optional override for the calibration temperature `T`.
+ *   When omitted, the cached value from {@link getTemperature} is used (1.0 by
+ *   default, an identity no-op). Tests pass this to assert `T != 1` behavior.
  * @returns Ranked predictions and the full probability vector.
  */
 export async function runTensor(
   session: ort.InferenceSession,
   tensorData: Float32Array,
   size: number = IMAGE_SIZE,
+  temperature?: number,
 ): Promise<InferenceResult> {
   const input = new ort.Tensor("float32", tensorData, [1, 3, size, size]);
   const feeds: Record<string, ort.Tensor> = { [session.inputNames[0]!]: input };
   const output = await session.run(feeds);
   const logits = output[session.outputNames[0]!]!.data as Float32Array;
-  const probs = softmax(logits);
+  // Temperature scaling before softmax. T=1.0 (the shipped default) is identity.
+  const t = temperature ?? (await getTemperature());
+  const probs = applyTemperature(logits, t);
 
   const ranked: Prediction[] = Array.from(probs, (prob, index) => ({
     label: CLASS_NAMES[index] ?? String(index),

@@ -72,6 +72,55 @@ export function resetHandLandmarker(): void {
   landmarkerPromise = null;
 }
 
+let imageLandmarkerPromise: Promise<HandLandmarker> | null = null;
+
+/**
+ * Lazily create (once) a SEPARATE {@link HandLandmarker} configured for stills.
+ *
+ * The shared {@link getHandLandmarker} instance runs in `"VIDEO"` mode and can
+ * only be driven via `detectForVideo`; calling `.detect()` on it throws. Uploads
+ * are single still images, so they need their own `"IMAGE"`-mode landmarker.
+ * Both share the same WASM fileset and model asset.
+ *
+ * @returns A promise resolving to the cached image-mode landmarker.
+ */
+export function getImageHandLandmarker(): Promise<HandLandmarker> {
+  if (!imageLandmarkerPromise) {
+    imageLandmarkerPromise = (async () => {
+      const fileset = await FilesetResolver.forVisionTasks(WASM_PATH);
+      return HandLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: MODEL_PATH },
+        runningMode: "IMAGE",
+        numHands: 1,
+      });
+    })();
+  }
+  return imageLandmarkerPromise;
+}
+
+/** Reset the cached image-mode landmarker (used by tests). */
+export function resetImageHandLandmarker(): void {
+  imageLandmarkerPromise = null;
+}
+
+/**
+ * Detect a hand in a single still image and return its normalized crop box.
+ *
+ * Uses the `"IMAGE"`-mode landmarker (so `.detect()` is valid). Returns the same
+ * {@link HandDetection} shape as {@link cropBoxFromLandmarks}: `found:false` when
+ * no hand is present, so callers can fall back to whole-image classification.
+ *
+ * @param image - A decoded image (or other still source) to detect a hand in.
+ * @returns A {@link HandDetection} with the square crop box when a hand is found.
+ */
+export async function detectHandInImage(
+  image: ImageBitmapSource | HTMLImageElement | HTMLCanvasElement,
+): Promise<HandDetection> {
+  const landmarker = await getImageHandLandmarker();
+  const result = landmarker.detect(image as Parameters<HandLandmarker["detect"]>[0]);
+  return cropBoxFromLandmarks(result);
+}
+
 /**
  * Compute a square, margined crop box from MediaPipe landmark results.
  *

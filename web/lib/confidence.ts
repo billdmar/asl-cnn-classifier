@@ -2,14 +2,17 @@
  * Confidence interpretation and the honest "unsure" state.
  *
  * The model was trained on uniform images and is over-confident on cluttered
- * real-world webcam frames. Until a measured temperature-scaling calibration
- * ships (the ML calibration workstream), we render low-confidence predictions
- * as an explicit "unsure" prompt rather than a confident wrong letter.
+ * real-world webcam frames. We render low-confidence predictions as an explicit
+ * "unsure" prompt rather than a confident wrong letter.
  *
- * IMPORTANT (honesty): the threshold below is a HEURISTIC, not a calibrated
- * probability. It is labeled as such in the UI. When real reliability data is
- * produced, replace {@link UNSURE_THRESHOLD} with the calibrated operating point
- * and update the copy.
+ * IMPORTANT (honesty): temperature scaling is now WIRED end-to-end (see
+ * `lib/inference.ts::applyTemperature`), but it is set to T=1.0 (identity, no
+ * behavior change) pending a fit on deployment-like data. A fit on the clean
+ * benchmark would sharpen (the model is under-confident there) and is
+ * deliberately not shipped. Consequently the threshold below remains a
+ * HEURISTIC, not yet a calibrated probability — it is labeled as such in the UI.
+ * When a real-world temperature + reliability fit lands, revisit
+ * {@link UNSURE_THRESHOLD} as the calibrated operating point and update the copy.
  */
 
 import type { InferenceResult, Prediction } from "./inference";
