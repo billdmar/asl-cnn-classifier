@@ -131,6 +131,8 @@ def test_calibration_main_end_to_end(tmp_path, monkeypatch, capsys):
             device="cpu",
             n_bins=10,
             seed=42,
+            fit_temperature=False,
+            inference_out=None,
         ),
     )
     rc = calmod.main()
@@ -145,6 +147,108 @@ def test_calibration_main_end_to_end(tmp_path, monkeypatch, capsys):
     payload = load_json(cal_json)
     assert 0.0 <= payload["ece"] <= 1.0
     assert "demonstration" in payload["note"].lower()
+    # Temperature scaling is wired but inert by default (no --fit_temperature).
+    assert payload["temperature"] == 1.0
+    assert payload["temperature_fit_on"] == "none"
+
+
+# --------------------------------------------------------------------------- #
+# Temperature scaling (Guo et al., 2017) — the calibration plumbing.
+# --------------------------------------------------------------------------- #
+def _synthetic_logits(n: int = 2000, num_classes: int = 5, seed: int = 0):
+    """Perfectly-calibrated logits + labels SAMPLED from their softmax.
+
+    Drawing each label from ``Categorical(softmax(logit_row))`` makes the base
+    logits genuinely calibrated: ``T = 1`` minimizes the NLL by construction. So
+    scaling the logits by a factor ``c`` is exactly equivalent to those same
+    calibrated logits at temperature ``c``, and ``fit_temperature`` on the scaled
+    logits must recover ``~c``. A large ``n`` keeps the sampling noise small.
+    """
+    rng = np.random.default_rng(seed)
+    logits = rng.normal(scale=2.0, size=(n, num_classes))
+    shifted = logits - logits.max(axis=1, keepdims=True)
+    probs = np.exp(shifted)
+    probs /= probs.sum(axis=1, keepdims=True)
+    labels = np.array(
+        [rng.choice(num_classes, p=probs[i]) for i in range(n)], dtype=np.int64
+    )
+    return logits.astype(np.float64), labels
+
+
+def test_fit_temperature_recovers_known_scaling():
+    """Scaling calibrated logits by 2.0 should be recovered as T ~= 2.0.
+
+    If logits L are well-fit at T=1, then logits (L * 2) are equivalent to L at
+    T=2, so fitting temperature on the scaled logits must recover ~2.0.
+    """
+    logits, labels = _synthetic_logits()
+    scaled = logits * 2.0
+    t = calmod.fit_temperature(scaled, labels)
+    assert abs(t - 2.0) < 0.15
+
+
+def test_fit_temperature_near_one_on_calibrated_logits():
+    """On already-calibrated synthetic logits, the fitted T is ~1.0."""
+    logits, labels = _synthetic_logits(seed=7)
+    t = calmod.fit_temperature(logits, labels)
+    assert abs(t - 1.0) < 0.2
+
+
+def test_fit_temperature_is_positive_and_finite():
+    logits, labels = _synthetic_logits(seed=3)
+    t = calmod.fit_temperature(logits * 0.5, labels)
+    assert t > 0.0 and np.isfinite(t)
+
+
+def test_fit_temperature_empty_returns_identity():
+    assert calmod.fit_temperature(np.empty((0, 0)), np.array([])) == 1.0
+
+
+def test_collect_logits_empty_loader():
+    logits, labels = calmod.collect_logits(
+        torch.nn.Linear(2, 2), [], torch.device("cpu")
+    )
+    assert logits.size == 0 and labels.size == 0
+
+
+def test_resolve_temperature_inert_without_flag():
+    """No --fit_temperature -> identity, regardless of data dir."""
+    logits, labels = _synthetic_logits()
+    t, fit_on = calmod._resolve_temperature(False, "data/asl_real", logits, labels)
+    assert t == 1.0 and fit_on == "none"
+
+
+def test_resolve_temperature_refuses_sample_dir_even_with_flag():
+    """Even with the flag, the synthetic sample fixture must not be fit on."""
+    logits, labels = _synthetic_logits()
+    t, fit_on = calmod._resolve_temperature(True, "data/sample", logits, labels)
+    assert t == 1.0 and fit_on == "none"
+
+
+def test_resolve_temperature_fits_on_real_dir_with_flag():
+    """Flag + real dir -> a fitted T tagged with the dir it was fit on."""
+    logits, labels = _synthetic_logits()
+    t, fit_on = calmod._resolve_temperature(True, "data/asl_real", logits * 2.0, labels)
+    assert fit_on == "data/asl_real"
+    assert abs(t - 2.0) < 0.15
+
+
+def test_write_inference_calibration_merges_temperature(tmp_path):
+    """The inference file keeps existing real ECE and gains temperature fields."""
+    from src.utils import load_json, save_json
+
+    path = tmp_path / "calibration.json"
+    save_json(path, {"ece": 0.0464, "accuracy": 0.968, "bins": {"bin_count": [1]}})
+    calmod.write_inference_calibration(path, 1.0, "none")
+    payload = load_json(path)
+    # Real ECE preserved.
+    assert payload["ece"] == 0.0464
+    assert payload["accuracy"] == 0.968
+    assert payload["bins"] == {"bin_count": [1]}
+    # Temperature merged in, inert.
+    assert payload["temperature"] == 1.0
+    assert payload["temperature_fit_on"] == "none"
+    assert "inert" in payload["temperature_note"].lower()
 
 
 # --------------------------------------------------------------------------- #

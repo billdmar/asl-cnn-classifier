@@ -24,8 +24,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfidenceBars } from "@/components/webcam/confidence-bars";
+import { CAPTURE_LETTERS, downloadCanvasAsPng } from "@/components/webcam/capture";
+import {
+  averageProbs,
+  rankFromProbs,
+  SMOOTHING_WINDOW,
+} from "@/components/webcam/smoothing";
 import { interpret, type ConfidenceVerdict } from "@/lib/confidence";
 import { cropBoxFromLandmarks, cropToCanvas, type CropBox } from "@/lib/handcrop";
+import { CLASS_NAMES } from "@/lib/labels";
 import { IMAGE_SIZE } from "@/lib/preprocess";
 import type { InferenceResult } from "@/lib/inference";
 import { useClassifier } from "@/lib/use-classifier";
@@ -38,6 +45,11 @@ type CameraState = "idle" | "requesting" | "active" | "denied" | "no-camera" | "
 const CLASSIFY_INTERVAL_MS = 120;
 /** Rolling-average window for the FPS readout. */
 const FPS_SMOOTHING = 0.9;
+/**
+ * After the hand has been gone this long (ms), drop the smoothing buffer so a
+ * stale letter doesn't linger once the user lowers their hand.
+ */
+const HAND_LOST_RESET_MS = 600;
 
 export function WebcamPanel() {
   const reduceMotion = useReducedMotion();
@@ -53,6 +65,12 @@ export function WebcamPanel() {
   const lastFrameRef = useRef(0);
   const inflightRef = useRef(false);
   const runningRef = useRef(false);
+  /** Last N raw probability vectors, averaged into the displayed result. */
+  const probsBufferRef = useRef<Float32Array[]>([]);
+  /** Timestamp of the most recent frame in which a hand was detected. */
+  const lastHandSeenRef = useRef(0);
+  /** The most recent cropped 128x128 hand canvas — what "Capture" saves. */
+  const lastCropRef = useRef<HTMLCanvasElement | null>(null);
 
   const [cameraState, setCameraState] = useState<CameraState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -60,6 +78,8 @@ export function WebcamPanel() {
   const [verdict, setVerdict] = useState<ConfidenceVerdict | null>(null);
   const [handFound, setHandFound] = useState(false);
   const [fps, setFps] = useState(0);
+  const [captureLetter, setCaptureLetter] = useState("A");
+  const [captureCount, setCaptureCount] = useState(0);
 
   /** Draw (or clear) the ROI box on the overlay canvas, sized to the video. */
   const drawOverlay = useCallback((box: CropBox | null) => {
@@ -110,6 +130,21 @@ export function WebcamPanel() {
         setHandFound(crop.found);
         drawOverlay(crop.box ?? null);
 
+        if (crop.found) {
+          lastHandSeenRef.current = now;
+        } else if (
+          lastHandSeenRef.current !== 0 &&
+          now - lastHandSeenRef.current > HAND_LOST_RESET_MS &&
+          probsBufferRef.current.length > 0
+        ) {
+          // Hand gone long enough: clear the smoothing buffer + crop so a stale
+          // letter doesn't linger.
+          probsBufferRef.current = [];
+          lastCropRef.current = null;
+          setResult(null);
+          setVerdict(null);
+        }
+
         // Throttle the expensive classify step; skip if one is in flight.
         if (
           crop.found &&
@@ -126,11 +161,19 @@ export function WebcamPanel() {
             crop.box,
             IMAGE_SIZE,
           );
+          lastCropRef.current = cropCanvas;
           classify(cropCanvas)
             .then((res) => {
               if (!runningRef.current) return;
-              setResult(res);
-              setVerdict(interpret(res));
+              // Push the raw probs into the rolling buffer (drop oldest), then
+              // render the element-wise-averaged, re-ranked result so the
+              // displayed letter stays stable across frames.
+              const buffer = probsBufferRef.current;
+              buffer.push(res.probs);
+              if (buffer.length > SMOOTHING_WINDOW) buffer.shift();
+              const smoothed = rankFromProbs(averageProbs(buffer), CLASS_NAMES);
+              setResult(smoothed);
+              setVerdict(interpret(smoothed));
             })
             .catch(() => {
               /* transient inference error — keep the loop alive */
@@ -169,6 +212,9 @@ export function WebcamPanel() {
     lastFrameRef.current = 0;
     lastClassifyRef.current = 0;
     inflightRef.current = false;
+    probsBufferRef.current = [];
+    lastHandSeenRef.current = 0;
+    lastCropRef.current = null;
     setHandFound(false);
     setFps(0);
     setResult(null);
@@ -203,6 +249,9 @@ export function WebcamPanel() {
       setCameraState("active");
       runningRef.current = true;
       lastFrameRef.current = 0;
+      probsBufferRef.current = [];
+      lastHandSeenRef.current = 0;
+      lastCropRef.current = null;
       rafRef.current = requestAnimationFrame(() => void tick());
     } catch (err: unknown) {
       streamRef.current = null;
@@ -219,6 +268,14 @@ export function WebcamPanel() {
       }
     }
   }, [tick, warmUp]);
+
+  /** Save the current hand crop as a labeled PNG download (eval-set builder). */
+  const captureFrame = useCallback(() => {
+    const crop = lastCropRef.current;
+    if (!crop) return;
+    downloadCanvasAsPng(crop, captureLetter);
+    setCaptureCount((n) => n + 1);
+  }, [captureLetter]);
 
   // Clean teardown on unmount.
   useEffect(() => stopCamera, [stopCamera]);
@@ -344,6 +401,48 @@ export function WebcamPanel() {
               <li>Keep your hand centered in the box</li>
             </ul>
           </div>
+
+          {/* Eval-set builder — unobtrusive, collapsed by default. */}
+          {isActive && (
+            <details className="rounded-lg border border-border bg-bg text-xs">
+              <summary className="cursor-pointer rounded-lg px-3 py-2 font-medium text-fg-muted outline-none focus-visible:ring-2 focus-visible:ring-accent">
+                Build a test set
+              </summary>
+              <div className="flex flex-col gap-2 px-3 pb-3">
+                <div className="flex items-end gap-2">
+                  <label className="flex flex-col gap-1 text-fg-subtle">
+                    <span>Label</span>
+                    <select
+                      value={captureLetter}
+                      onChange={(e) => setCaptureLetter(e.target.value)}
+                      className="rounded-md border border-border bg-bg-card px-2 py-1 font-mono text-sm text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      aria-label="Letter to label the captured frame"
+                    >
+                      {CAPTURE_LETTERS.map((letter) => (
+                        <option key={letter} value={letter}>
+                          {letter}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <Button
+                    variant="outline"
+                    onClick={captureFrame}
+                    disabled={!handFound}
+                  >
+                    Capture
+                  </Button>
+                </div>
+                <p className="text-fg-subtle">
+                  Captured frames download locally — use them to build a
+                  real-world test set.
+                  {captureCount > 0 && (
+                    <span className="text-fg-muted"> ({captureCount} saved)</span>
+                  )}
+                </p>
+              </div>
+            </details>
+          )}
 
           <p className="flex items-center gap-1.5 text-xs text-fg-subtle">
             <ShieldCheck className="h-3.5 w-3.5 text-accent" aria-hidden="true" />

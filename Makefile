@@ -3,7 +3,7 @@
 
 PY := .venv/bin/python
 
-.PHONY: install download-real sample-train train train-real eval eval-real gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
+.PHONY: install download-real download-crossval sample-train train train-real eval eval-real eval-realworld gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
 
 # Target Hugging Face Space, e.g. `export HF_SPACE=you/asl-cnn-classifier`.
 HF_SPACE ?=
@@ -18,6 +18,12 @@ install:
 # into data/asl_real/<CLASS>/<i>.png. Add --max_per_class N for a fast subset.
 download-real:
 	$(PY) -m src.download_hf_data --out_dir data/asl_real
+
+# Download a SECOND, more diverse 26-class A–Z ASL dataset (EitanG98/asl_letters:
+# different signers + real photo backgrounds) into data/asl_crossval/, capped at
+# 30/class, for the honest cross-dataset generalization measurement.
+download-crossval:
+	$(PY) -m src.download_hf_data --dataset asl_letters --out_dir data/asl_crossval --max_per_class 30
 
 # Quick end-to-end smoke train on the tiny committed sample set (CPU, 2 epochs).
 sample-train:
@@ -48,6 +54,12 @@ eval:
 # Evaluate the real-data checkpoint on the held-out real test split.
 eval-real:
 	$(PY) -m src.eval --checkpoint artifacts/checkpoints/best_model.pth --data_dir data/asl_real
+
+# HONEST cross-dataset generalization: run the deployed checkpoint on a DIFFERENT
+# dataset (run `make download-crossval` first). Hand-crop ON; writes
+# artifacts/realworld_eval.json. This is NOT the 96.8% same-dataset benchmark.
+eval-realworld:
+	$(PY) -m src.eval_realworld --checkpoint artifacts/checkpoints/best_model.pth --data_dir data/asl_crossval
 
 # Grad-CAM explainability overlay for a single image (uses sample data here).
 gradcam:

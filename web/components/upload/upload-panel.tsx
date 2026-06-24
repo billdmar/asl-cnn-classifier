@@ -5,7 +5,13 @@ import { AlertCircle, ImageUp, Loader2, UploadCloud } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { interpret, type ConfidenceVerdict } from "@/lib/confidence";
+import {
+  cropToCanvas,
+  detectHandInImage,
+  getImageHandLandmarker,
+} from "@/lib/handcrop";
 import { classifyImage, type InferenceResult } from "@/lib/inference";
+import { IMAGE_SIZE } from "@/lib/preprocess";
 import { cn } from "@/lib/utils";
 
 import { ResultBars } from "./result-bars";
@@ -25,6 +31,8 @@ type Status = "idle" | "loading" | "done" | "error";
 interface Outcome {
   result: InferenceResult;
   verdict: ConfidenceVerdict;
+  /** Whether a hand was detected and the image was cropped before classifying. */
+  handFound: boolean;
 }
 
 /**
@@ -64,6 +72,15 @@ export function UploadPanel() {
     };
   }, []);
 
+  // Warm the IMAGE-mode hand landmarker so the first upload isn't slow. Browser
+  // API access is confined to this effect (never module scope) to stay SSR-safe.
+  useEffect(() => {
+    void getImageHandLandmarker().catch(() => {
+      // Warm-up failures are non-fatal: classifyFromUrl falls back to the
+      // whole-image path, so swallow here and let the real run surface state.
+    });
+  }, []);
+
   /** Classify an already-loaded preview image and update result state. */
   const classifyFromUrl = useCallback(async (url: string, knownLabel: string | null) => {
     setStatus("loading");
@@ -73,8 +90,30 @@ export function UploadPanel() {
     setPreviewUrl(url);
     try {
       const img = await loadImage(url);
-      const result = await classifyImage(img);
-      setOutcome({ result, verdict: interpret(result) });
+
+      // Crop to the hand first (mirrors the webcam path) so the model sees a
+      // tight, background-free hand instead of the whole squeezed photo. A
+      // detection failure must never crash the UI — fall back to whole-image.
+      let handFound = false;
+      let source: CanvasImageSource = img;
+      try {
+        const detection = await detectHandInImage(img);
+        if (detection.found && detection.box) {
+          source = cropToCanvas(
+            img,
+            img.naturalWidth,
+            img.naturalHeight,
+            detection.box,
+            IMAGE_SIZE,
+          );
+          handFound = true;
+        }
+      } catch {
+        // Detection hiccup (e.g. WASM failed to load) — classify whole image.
+      }
+
+      const result = await classifyImage(source);
+      setOutcome({ result, verdict: interpret(result), handFound });
       setStatus("done");
     } catch (err) {
       setError(
@@ -277,6 +316,13 @@ export function UploadPanel() {
                     </p>
                   )}
                 </div>
+
+                {!outcome.handFound && (
+                  <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+                    No hand detected — classified the whole image; the result may
+                    be unreliable. Try a clearer photo of a single hand.
+                  </p>
+                )}
 
                 {outcome.verdict.unsure && (
                   <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
