@@ -60,6 +60,13 @@ benchmark-backends:
 export-onnx:
 	$(PY) -m src.export_onnx --output artifacts/model.onnx --device cpu
 
+# Export the ONNX model to the web showcase's committed static asset path and
+# regenerate the cross-language parity fixtures from it. Run after retraining so
+# the live site and the parity gate both track the current checkpoint.
+export-onnx-web:
+	$(PY) -m src.export_onnx --output web/public/model/model.onnx --device cpu
+	$(PY) -m src.gen_parity_fixtures --onnx web/public/model/model.onnx
+
 # Dynamic INT8 quantization + on-disk FP32 vs INT8 size report.
 quantize:
 	$(PY) -m src.quantize --output artifacts/quantization.json --device cpu
