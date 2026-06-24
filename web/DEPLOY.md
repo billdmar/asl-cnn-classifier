@@ -4,37 +4,34 @@ The site is a **static export** (`output: "export"` → `web/out/`). It runs all
 inference in the browser, so there is no server runtime — any static host works,
 but the repo is wired for Vercel.
 
-## One-time setup
+## Live deployment
 
-The repo root `vercel.json` already points Vercel at the `web/` subdirectory:
+**Production:** <https://asl-cnn-classifier.vercel.app>
 
-```json
-{
-  "buildCommand": "cd web && npm run build",
-  "outputDirectory": "web/out",
-  "installCommand": "cd web && npm install",
-  "framework": "nextjs"
-}
-```
+The Vercel project is configured with **Root Directory = `web`**, so Vercel
+detects Next.js in `web/package.json` and builds natively — no `vercel.json` and
+no `cd web` indirection. A repo-root `.vercelignore` keeps the dataset, venv, and
+caches out of the upload.
 
 ### Option A — Vercel dashboard (recommended, auto-deploys on push)
 
 1. Go to <https://vercel.com/new> and import `billdmar/asl-cnn-classifier`.
-2. Leave the framework preset as **Next.js**; Vercel reads `vercel.json` for the
-   build/output settings (root directory stays the repo root).
+2. Set **Root Directory** to `web` (Settings → General → Root Directory). Vercel
+   then auto-detects the **Next.js** preset.
 3. Deploy. Every push to `main` then auto-deploys; pushes to other branches get
    preview URLs.
 
 ### Option B — Vercel CLI (manual)
 
 ```bash
-# From the repo root. Requires `vercel login` first.
-vercel            # creates a preview deployment, prints a URL
-vercel --prod     # promotes to production
+# From the repo root (the project is already linked). Requires `vercel login`.
+vercel deploy --prod --yes --archive=tgz   # --archive avoids the free-tier
+                                           # per-file upload rate limit
 ```
 
-> The CLI needs your authenticated Vercel account — that's a human step. The
-> agent does not deploy or hold your Vercel credentials.
+> The CLI needs your authenticated Vercel account. The project's Root Directory
+> is `web`; if you re-link a fresh project, set it (see Option A step 2) or the
+> build fails with "No Next.js version detected."
 
 ## What gets served
 
