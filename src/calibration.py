@@ -65,6 +65,27 @@ SAMPLE_DATA_NOTE = (
     "are synthetic. Train on the full ASL Alphabet dataset for real numbers."
 )
 
+REAL_DATA_NOTE = (
+    "ECE measured on the held-out test split of the real ASL dataset with the "
+    "trained MobileNetV2 checkpoint — a meaningful calibration assessment. "
+    "Compare 'mean_confidence' against 'accuracy' to read the direction of "
+    "miscalibration; the reliability diagram shows where per-bin confidence and "
+    "accuracy diverge."
+)
+
+
+def _calibration_note(data_dir: str, trained: bool) -> str:
+    """Pick an honest note based on the actual data and checkpoint used.
+
+    The synthetic-fixture disclaimer only applies when the run genuinely used
+    the ``data/sample`` wiring fixture or an untrained model; otherwise the
+    numbers are a real measurement and must be described as such.
+    """
+    is_sample = "sample" in Path(data_dir).parts
+    if is_sample or not trained:
+        return SAMPLE_DATA_NOTE
+    return REAL_DATA_NOTE
+
 
 def compute_ece(
     confidences: np.ndarray,
@@ -253,8 +274,10 @@ def main() -> int:
     )
     test_loader = DataLoader(test_ds, batch_size=32, shuffle=False, num_workers=0)
 
+    trained = Path(args.checkpoint).exists()
     model, _ = load_checkpoint(args.checkpoint, device)
     confidences, predictions, labels = collect_predictions(model, test_loader, device)
+    note = _calibration_note(args.data_dir, trained)
 
     ece, bin_stats = compute_ece(confidences, predictions, labels, n_bins=args.n_bins)
 
@@ -271,7 +294,8 @@ def main() -> int:
         "accuracy": (float(np.mean(predictions == labels)) if labels.size > 0 else 0.0),
         "bins": bin_stats,
         "checkpoint": str(args.checkpoint),
-        "note": SAMPLE_DATA_NOTE,
+        "data_dir": str(args.data_dir),
+        "note": note,
     }
     calibration_path = ARTIFACTS / "calibration.json"
     save_json(calibration_path, payload)
@@ -283,7 +307,7 @@ def main() -> int:
     print(f"ECE ({args.n_bins} bins)    : {ece:.4f}")
     print(f"\nSaved calibration to       {calibration_path}")
     print(f"Saved reliability diagram  {diagram_path}")
-    print(f"\nNOTE: {SAMPLE_DATA_NOTE}")
+    print(f"\nNOTE: {note}")
     return 0
 
 

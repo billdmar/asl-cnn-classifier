@@ -12,6 +12,8 @@ import {
   toClassRows,
   topConfusedPairs,
   bestValEpoch,
+  toReliabilityRows,
+  type CalibrationData,
   type Metrics,
   type TrainingHistory,
 } from "../metrics";
@@ -25,6 +27,10 @@ const metrics = JSON.parse(
 const history = JSON.parse(
   readFileSync(path.join(METRICS_DIR, "training_history.json"), "utf-8"),
 ) as TrainingHistory;
+
+const calibration = JSON.parse(
+  readFileSync(path.join(METRICS_DIR, "calibration.json"), "utf-8"),
+) as CalibrationData;
 
 describe("toClassRows", () => {
   it("produces one row per class (26 letters)", () => {
@@ -64,6 +70,36 @@ describe("topConfusedPairs", () => {
     const original = [...metrics.most_confused_pairs];
     topConfusedPairs(metrics.most_confused_pairs, 2);
     expect(metrics.most_confused_pairs).toEqual(original);
+  });
+});
+
+describe("toReliabilityRows", () => {
+  it("drops empty bins and keeps only populated ones from the real data", () => {
+    const rows = toReliabilityRows(calibration.bins);
+    // First two bins (lowers 0.0 and 0.1) have count 0; 8 of 10 remain.
+    expect(rows).toHaveLength(8);
+    expect(rows.every((r) => r.count > 0)).toBe(true);
+  });
+
+  it("pairs bin midpoints with the real per-bin accuracy and confidence", () => {
+    const rows = toReliabilityRows(calibration.bins);
+    // The most-populated bin is the last one: [0.9, 1.0].
+    const last = rows[rows.length - 1];
+    expect(last?.midpoint).toBeCloseTo(0.95, 10);
+    expect(last?.lower).toBe(0.9);
+    expect(last?.upper).toBe(1.0);
+    expect(last?.acc).toBeCloseTo(0.9968919968919969, 10);
+    expect(last?.conf).toBeCloseTo(0.9768822673410061, 10);
+    expect(last?.count).toBe(1287);
+    // The first populated bin is [0.2, 0.3] with 2 samples.
+    expect(rows[0]?.midpoint).toBeCloseTo(0.25, 10);
+    expect(rows[0]?.count).toBe(2);
+  });
+
+  it("returns rows in ascending-confidence (JSON) order", () => {
+    const rows = toReliabilityRows(calibration.bins);
+    const mids = rows.map((r) => r.midpoint);
+    expect(mids).toEqual([...mids].sort((a, b) => a - b));
   });
 });
 

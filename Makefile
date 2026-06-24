@@ -32,6 +32,15 @@ train:
 train-real:
 	$(PY) -m src.train --config configs/train_real_mobilenet.yaml
 
+# Robustness retrain with aggressive domain augmentation → SEPARATE checkpoint
+# (artifacts/checkpoints_robust/). Does NOT clobber the verified baseline.
+train-robust:
+	$(PY) -m src.train --config configs/train_robust_mobilenet.yaml
+
+# Evaluate the robustness checkpoint on the held-out real test split.
+eval-robust:
+	$(PY) -m src.eval --checkpoint artifacts/checkpoints_robust/best_model.pth --data_dir data/asl_real
+
 # Evaluate a trained checkpoint (uses sample data here for a fast check).
 eval:
 	$(PY) -m src.eval --config configs/train_custom_cnn.yaml --checkpoint artifacts/checkpoints/best_model.pth --data_dir data/sample

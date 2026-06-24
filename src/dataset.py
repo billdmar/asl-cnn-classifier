@@ -36,13 +36,47 @@ IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
 
-def get_train_transforms(image_size: int = IMAGE_SIZE) -> transforms.Compose:
+def get_train_transforms(
+    image_size: int = IMAGE_SIZE, heavy: bool = False
+) -> transforms.Compose:
     """Augmentation pipeline for training.
 
     NOTE: deliberately **no horizontal flip** — ASL signs are not
     flip-invariant (e.g. b/d, p/q are mirror images, and several letters differ
     only by orientation). Flipping would create mislabeled training data.
+
+    Args:
+        image_size: Output side length.
+        heavy: When ``True``, use the aggressive domain-augmentation pipeline
+            intended to close the benchmark→real-world gap — wider
+            crop/rotation/affine ranges, stronger lighting/contrast jitter,
+            random Gaussian blur, grayscale (a crude skin-tone invariance), and
+            random erasing (occlusion robustness). These deliberately make the
+            *training* distribution look more like a cluttered webcam; the
+            eval transform stays untouched so the held-out metric is comparable.
     """
+    if heavy:
+        return transforms.Compose(
+            [
+                transforms.RandomResizedCrop(
+                    image_size, scale=(0.6, 1.0), ratio=(0.8, 1.25)
+                ),
+                transforms.RandomRotation(25),
+                transforms.RandomAffine(
+                    degrees=0, translate=(0.18, 0.18), scale=(0.8, 1.2), shear=12
+                ),
+                transforms.ColorJitter(
+                    brightness=0.5, contrast=0.5, saturation=0.4, hue=0.08
+                ),
+                transforms.RandomGrayscale(p=0.15),
+                transforms.RandomApply(
+                    [transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))], p=0.3
+                ),
+                transforms.ToTensor(),
+                transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+                transforms.RandomErasing(p=0.25, scale=(0.02, 0.15)),
+            ]
+        )
     return transforms.Compose(
         [
             transforms.RandomResizedCrop(image_size, scale=(0.85, 1.0)),
