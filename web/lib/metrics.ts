@@ -6,11 +6,10 @@
  * data — it never hardcodes a measured value. The metrics were computed on the
  * held-out test set described by {@link Metrics.num_test_samples}.
  *
- * NOTE on calibration: `public/metrics/calibration.json` is NOT yet a real
- * measurement (it was produced on a synthetic fixture), so this module
- * deliberately exposes NO calibration/ECE/reliability loader. The dashboard
- * renders a clearly-labeled "coming with the calibration workstream" placeholder
- * instead.
+ * NOTE on calibration: `public/metrics/calibration.json` is a REAL measurement —
+ * ECE and the per-bin reliability curve were computed on the held-out real test
+ * split with the trained MobileNetV2 checkpoint. {@link fetchCalibration} loads
+ * it and {@link toReliabilityRows} reshapes the populated bins for charting.
  */
 
 /** Per-class classification scores (precision/recall/F1 + sample count). */
@@ -59,6 +58,42 @@ export interface ClassRow extends ClassMetrics {
   letter: string;
 }
 
+/** Per-bin reliability arrays from `public/metrics/calibration.json`. */
+export interface CalibrationBins {
+  bin_lowers: number[];
+  bin_uppers: number[];
+  bin_acc: number[];
+  bin_conf: number[];
+  bin_count: number[];
+}
+
+/** Shape of `public/metrics/calibration.json`. */
+export interface CalibrationData {
+  ece: number;
+  n_bins: number;
+  num_test_samples: number;
+  mean_confidence: number;
+  accuracy: number;
+  bins: CalibrationBins;
+  checkpoint: string;
+  data_dir: string;
+  note: string;
+}
+
+/** A single populated reliability-diagram bin, ready for charting. */
+export interface ReliabilityRow {
+  /** Bin midpoint ((lower + upper) / 2) — the x position. */
+  midpoint: number;
+  lower: number;
+  upper: number;
+  /** Empirical accuracy of samples in this bin (the reliability y value). */
+  acc: number;
+  /** Mean predicted confidence of samples in this bin. */
+  conf: number;
+  /** Number of test samples that fell into this bin. */
+  count: number;
+}
+
 /**
  * Fetch the held-out test-set metrics.
  *
@@ -87,6 +122,52 @@ export async function fetchTrainingHistory(): Promise<TrainingHistory> {
     );
   }
   return (await res.json()) as TrainingHistory;
+}
+
+/**
+ * Fetch the held-out test-set calibration measurement (ECE + reliability bins).
+ *
+ * @returns The parsed {@link CalibrationData} object.
+ * @throws If the request fails or returns a non-OK status.
+ */
+export async function fetchCalibration(): Promise<CalibrationData> {
+  const res = await fetch("/metrics/calibration.json");
+  if (!res.ok) {
+    throw new Error(`Failed to load calibration.json: ${res.status} ${res.statusText}`);
+  }
+  return (await res.json()) as CalibrationData;
+}
+
+/**
+ * Pair each reliability bin's midpoint with its empirical accuracy and
+ * confidence, dropping empty bins (`bin_count === 0`) so the diagram only plots
+ * regions backed by real samples. Bins are returned in ascending-confidence
+ * order (the JSON's natural order).
+ *
+ * @param bins - The `bins` object from {@link CalibrationData}.
+ * @returns One {@link ReliabilityRow} per populated bin.
+ */
+export function toReliabilityRows(bins: CalibrationBins): ReliabilityRow[] {
+  const rows: ReliabilityRow[] = [];
+  for (let i = 0; i < bins.bin_count.length; i += 1) {
+    const count = bins.bin_count[i];
+    const lower = bins.bin_lowers[i];
+    const upper = bins.bin_uppers[i];
+    const acc = bins.bin_acc[i];
+    const conf = bins.bin_conf[i];
+    if (
+      count === undefined ||
+      lower === undefined ||
+      upper === undefined ||
+      acc === undefined ||
+      conf === undefined ||
+      count <= 0
+    ) {
+      continue;
+    }
+    rows.push({ midpoint: (lower + upper) / 2, lower, upper, acc, conf, count });
+  }
+  return rows;
 }
 
 /**

@@ -5,16 +5,19 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   bestValEpoch,
+  fetchCalibration,
   fetchMetrics,
   fetchTrainingHistory,
   topConfusedPairs,
   toClassRows,
+  type CalibrationData,
   type Metrics,
   type TrainingHistory,
 } from "@/lib/metrics";
 
 import { ConfusedPairs } from "./confused-pairs";
 import { PerClassChart } from "./per-class-chart";
+import { ReliabilityChart } from "./reliability-chart";
 import { StatCards, type Stat } from "./stat-cards";
 import { TrainingChart } from "./training-chart";
 
@@ -23,7 +26,12 @@ const SOURCE = "measured on the held-out test set (1,631 images)";
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; metrics: Metrics; history: TrainingHistory };
+  | {
+      status: "ready";
+      metrics: Metrics;
+      history: TrainingHistory;
+      calibration: CalibrationData;
+    };
 
 /** Visually-hidden text for screen readers (mirrors Tailwind's sr-only). */
 function SrOnly({ children }: { children: React.ReactNode }) {
@@ -49,9 +57,9 @@ export function MetricsDashboard() {
   useEffect(() => {
     setMounted(true);
     let cancelled = false;
-    Promise.all([fetchMetrics(), fetchTrainingHistory()])
-      .then(([metrics, history]) => {
-        if (!cancelled) setState({ status: "ready", metrics, history });
+    Promise.all([fetchMetrics(), fetchTrainingHistory(), fetchCalibration()])
+      .then(([metrics, history, calibration]) => {
+        if (!cancelled) setState({ status: "ready", metrics, history, calibration });
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -87,7 +95,7 @@ export function MetricsDashboard() {
     );
   }
 
-  const { metrics, history } = state;
+  const { metrics, history, calibration } = state;
   const best = bestValEpoch(history);
   const classRows = toClassRows(metrics.per_class);
   const pairs = topConfusedPairs(metrics.most_confused_pairs, 10);
@@ -187,20 +195,46 @@ export function MetricsDashboard() {
           <CardHeader>
             <CardTitle>Calibration &amp; reliability</CardTitle>
             <p className="text-sm text-fg-muted">
-              Confidence calibration (ECE, reliability diagram)
+              Per-bin accuracy vs. confidence against the perfect-calibration diagonal —{" "}
+              {SOURCE}.
             </p>
           </CardHeader>
           <CardContent>
-            <div className="flex min-h-[12rem] flex-col items-center justify-center rounded-lg border border-dashed border-border text-center">
-              <p className="text-sm font-medium text-fg-muted">
-                Coming with the calibration workstream
-              </p>
-              <p className="mt-2 max-w-xs text-xs text-fg-subtle">
-                We only show numbers measured on real data. A calibrated reliability
-                diagram will appear here once it&apos;s computed on the held-out set — not
-                on a synthetic fixture.
-              </p>
-            </div>
+            <dl className="mb-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+              <div>
+                <dt className="text-xs text-fg-subtle">ECE</dt>
+                <dd className="font-semibold tabular-nums text-fg">
+                  {calibration.ece.toFixed(3)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-fg-subtle">Test images</dt>
+                <dd className="font-semibold tabular-nums text-fg">
+                  {calibration.num_test_samples.toLocaleString()}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-fg-subtle">Accuracy</dt>
+                <dd className="font-semibold tabular-nums text-fg">
+                  {pct(calibration.accuracy)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-fg-subtle">Mean confidence</dt>
+                <dd className="font-semibold tabular-nums text-fg">
+                  {pct(calibration.mean_confidence)}
+                </dd>
+              </div>
+            </dl>
+            {mounted ? <ReliabilityChart calibration={calibration} /> : null}
+            <SrOnly>
+              Reliability diagram measured on the held-out test set of{" "}
+              {calibration.num_test_samples.toLocaleString()} images. Expected calibration
+              error is {calibration.ece.toFixed(3)}. Aggregate mean confidence (
+              {pct(calibration.mean_confidence)}) is slightly below overall accuracy (
+              {pct(calibration.accuracy)}), so the model is mildly under-confident on
+              average; the diagram shows where per-bin confidence and accuracy diverge.
+            </SrOnly>
           </CardContent>
         </Card>
       </div>

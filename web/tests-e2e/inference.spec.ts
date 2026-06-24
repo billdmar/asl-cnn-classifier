@@ -38,4 +38,16 @@ test.describe("in-browser inference", () => {
     await expect(metrics).toContainText("97.8%", { timeout: 15_000 });
     await expect(metrics).toContainText("1,631", { timeout: 15_000 });
   });
+
+  test("calibration card renders real measured ECE (not a placeholder)", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const metrics = page.locator("#metrics");
+    // From the real calibration.json (ECE 0.046 on the held-out test set).
+    await expect(metrics).toContainText("ECE", { timeout: 15_000 });
+    await expect(metrics).toContainText("0.046", { timeout: 15_000 });
+    // The "coming soon" placeholder must be gone.
+    await expect(metrics).not.toContainText(/coming with the calibration/i);
+  });
 });

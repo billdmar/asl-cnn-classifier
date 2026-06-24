@@ -248,9 +248,10 @@ def main() -> None:
     )
 
     image_size = int(config["image_size"])
+    heavy_aug = bool(config.get("heavy_augmentation", False))
     train_ds = ASLDataset(
         samples=train_samples,
-        transform=get_train_transforms(image_size),
+        transform=get_train_transforms(image_size, heavy=heavy_aug),
         class_names=class_names,
     )
     val_ds = ASLDataset(
@@ -438,8 +439,14 @@ def main() -> None:
     print(f"Best validation accuracy: {best_val_acc:.4f}")
     print(f"Best checkpoint saved to: {best_path}")
 
-    save_json("artifacts/training_history.json", history)
-    print("Training history written to artifacts/training_history.json")
+    # Write history alongside the checkpoint so separate runs (e.g. a robustness
+    # retrain to a different checkpoint_dir) don't clobber each other's history.
+    # Also mirror to the canonical artifacts path for the default run.
+    history_path = checkpoint_dir / "training_history.json"
+    save_json(str(history_path), history)
+    print(f"Training history written to {history_path}")
+    if checkpoint_dir == Path("artifacts/checkpoints"):
+        save_json("artifacts/training_history.json", history)
 
 
 if __name__ == "__main__":
