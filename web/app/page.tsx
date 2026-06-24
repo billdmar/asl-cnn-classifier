@@ -1,9 +1,15 @@
 import { Footer } from "@/components/footer";
 import { Hero } from "@/components/hero";
+import { LazyVisible } from "@/components/lazy-visible";
 import { SiteHeader } from "@/components/site-header";
-import { MetricsDashboard } from "@/components/metrics/metrics-dashboard";
-import { UploadPanel } from "@/components/upload/upload-panel";
-import { WebcamPanel } from "@/components/webcam/webcam-panel";
+import { SkeletonCard } from "@/components/skeleton-card";
+// Heavy, below-the-fold panels (onnxruntime-web, recharts, @mediapipe) are
+// code-split via next/dynamic with ssr:false so their JS stays out of the
+// initial bundle. They are further wrapped in <LazyVisible> so the chunks and
+// assets only load once the section nears the viewport (or after an idle
+// fallback), keeping them off the hero's LCP critical path.
+// See components/home-sections.tsx and components/lazy-visible.tsx.
+import { MetricsDashboard, UploadPanel, WebcamPanel } from "@/components/home-sections";
 
 interface SectionShellProps {
   id: string;
@@ -39,7 +45,11 @@ export default function HomePage() {
             title="Live demo"
             blurb="Point your webcam at an ASL alphabet sign and watch the prediction update in real time. Your hand is detected and cropped, then classified — all on-device. Frames never leave your browser."
           >
-            <WebcamPanel />
+            <LazyVisible
+              placeholder={<SkeletonCard minHeight={420} label="Loading live demo" />}
+            >
+              <WebcamPanel />
+            </LazyVisible>
           </SectionShell>
 
           <SectionShell
@@ -47,7 +57,11 @@ export default function HomePage() {
             title="Upload an image"
             blurb="Prefer not to use a webcam? Drop in a photo of a hand sign — or click an example — and get a classification with top-5 probabilities."
           >
-            <UploadPanel />
+            <LazyVisible
+              placeholder={<SkeletonCard minHeight={360} label="Loading upload panel" />}
+            >
+              <UploadPanel />
+            </LazyVisible>
           </SectionShell>
 
           <SectionShell
@@ -55,7 +69,11 @@ export default function HomePage() {
             title="Metrics"
             blurb="Every number below is produced by reproducible code in the repo and measured on the held-out test set — nothing is hardcoded."
           >
-            <MetricsDashboard />
+            <LazyVisible
+              placeholder={<SkeletonCard minHeight={600} label="Loading metrics" />}
+            >
+              <MetricsDashboard />
+            </LazyVisible>
           </SectionShell>
 
           <SectionShell

@@ -25,17 +25,35 @@ const config: Config = {
           "radial-gradient(60% 60% at 50% 0%, rgba(124,92,255,0.18) 0%, rgba(10,10,15,0) 100%)",
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
-        mono: ["var(--font-geist-mono)", "ui-monospace", "monospace"],
+        // System font stack — no web-font fetch, so text paints immediately
+        // (no FOIT/FOUT, better LCP). Matches the modern "AI product" look.
+        sans: [
+          "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "Roboto",
+          "Helvetica Neue",
+          "Arial",
+          "sans-serif",
+        ],
+        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       keyframes: {
         "fade-up": {
           "0%": { opacity: "0", transform: "translateY(8px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        // Transform-only entrance for LCP-critical content: the element is
+        // painted fully opaque from the first frame (so Largest Contentful
+        // Paint fires immediately) while still getting a subtle slide-up.
+        "rise-up": {
+          "0%": { transform: "translateY(8px)" },
+          "100%": { transform: "translateY(0)" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.4s ease-out both",
+        "rise-up": "rise-up 0.4s ease-out both",
       },
     },
   },

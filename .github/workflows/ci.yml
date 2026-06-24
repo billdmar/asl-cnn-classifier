@@ -105,3 +105,6 @@ jobs:
 
       - name: E2E tests
         run: npm run test:e2e
+
+      - name: Lighthouse (perf + a11y budget, >=90)
+        run: npm run lighthouse
