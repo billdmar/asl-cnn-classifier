@@ -52,3 +52,4 @@ web/.last-run.json
 
 # ─── Agent / tooling scratch ────────────────────────────────
 .claude/
+.vercel

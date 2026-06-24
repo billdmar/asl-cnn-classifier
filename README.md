@@ -21,6 +21,8 @@ analysis.
 
 ## Live demo
 
+### 👉 [**asl-cnn-classifier.vercel.app**](https://asl-cnn-classifier.vercel.app)
+
 The flagship demo is a **polished in-browser website** (`web/`, Next.js +
 TypeScript) that runs the real MobileNetV2 model **100% client-side** via
 onnxruntime-web — live webcam classification with MediaPipe hand-crop, image
