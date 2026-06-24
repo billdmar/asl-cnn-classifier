@@ -21,10 +21,32 @@ analysis.
 
 ## Live demo
 
-A [Gradio](https://gradio.app) app (`app.py`) lets you upload a hand-sign image
-and see the predicted class plus top-5 probabilities.
+The flagship demo is a **polished in-browser website** (`web/`, Next.js +
+TypeScript) that runs the real MobileNetV2 model **100% client-side** via
+onnxruntime-web — live webcam classification with MediaPipe hand-crop, image
+upload, an interactive metrics dashboard wired to the real artifacts, and a
+model-card/story page. Webcam frames never leave the browser. It deploys as a
+static site to Vercel; see [`web/README.md`](web/README.md) and
+[`web/DEPLOY.md`](web/DEPLOY.md).
 
-### 👉 [**Try it live on Hugging Face Spaces**](https://huggingface.co/spaces/billdmar/asl-cnn-classifier)
+```bash
+cd web && npm install && npm run dev    # http://localhost:3000
+```
+
+What makes it trustworthy: a **cross-language preprocessing parity gate** proves
+the browser path reproduces the Python pipeline's predictions (strict tensor
+parity ~5e-7), and every displayed number is produced by reproducible code and
+labeled benchmark-vs-real-world. CI enforces TypeScript-strict, lint, unit +
+parity tests, Playwright E2E (including a real in-browser inference assertion),
+and a Lighthouse budget (performance 98 / accessibility 96, gated ≥90).
+
+### Legacy Gradio demo
+
+A [Gradio](https://gradio.app) app (`app.py`) also lets you upload a hand-sign
+image and see the predicted class plus top-5 probabilities — the optional legacy
+backend the website does not depend on.
+
+### 👉 [**Try the Gradio app on Hugging Face Spaces**](https://huggingface.co/spaces/billdmar/asl-cnn-classifier)
 
 ![ASL CNN Gradio demo](docs/demo.png)
 
@@ -96,6 +118,7 @@ make install
 | **Test accuracy — MobileNetV2, real ASL dataset (26 classes, held-out test)** | **96.8%** | **measured** (`make eval-real`, 1,631 test images) |
 | Macro F1 — same | **0.968** | measured |
 | Validation accuracy (best epoch) | **97.8%** | measured during `make train-real` |
+| Expected Calibration Error (ECE, 10 bins) | **0.046** | measured (`make calibration`, held-out test split) |
 | Test accuracy — MobileNetV2, full 29-class Kaggle set | ≥98% (target) | aspirational |
 | Custom-CNN parameters | **656,829** | measured (`tests/test_model.py` asserts this) |
 | CPU inference latency (mean) | **5.08 ms/frame** | measured, this machine |
