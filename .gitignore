@@ -22,6 +22,10 @@ runs/
 *.pth
 *.pt
 *.onnx
+# Exception: the web showcase ships the exported model as a committed static
+# deployment asset (Vercel serves it directly — there is no build-time export).
+# Keep it in sync with the trained checkpoint via `make export-onnx-web`.
+!web/public/model/*.onnx
 
 # ─── Dataset (downloaded, not committed — except the sample) ─
 data/*
@@ -33,6 +37,17 @@ data/*
 .idea/
 .vscode/
 *.swp
+
+# ─── Node / web (the web/ subproject manages its own build dirs) ─
+node_modules/
+.playwright-mcp/
+web/node_modules/
+web/.next/
+web/out/
+web/test-results/
+web/playwright-report/
+web/.last-run.json
+*.tsbuildinfo
 
 # ─── Agent / tooling scratch ────────────────────────────────
 .claude/
