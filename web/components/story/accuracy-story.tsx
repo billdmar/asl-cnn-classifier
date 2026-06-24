@@ -83,6 +83,38 @@ export function AccuracyStory() {
           </p>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">
+            A robustness experiment, reported honestly
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p>
+            We retrained the same MobileNetV2 with{" "}
+            <strong className="text-fg">aggressive domain augmentation</strong> (wide
+            crops/rotations, strong lighting and contrast jitter, random grayscale, blur,
+            and erasing) aimed at the cluttered-webcam case — reproducible with{" "}
+            <code className="rounded bg-bg-subtle px-1 py-0.5 text-xs">
+              make train-robust
+            </code>
+            .
+          </p>
+          <p>
+            Measured on the <strong className="text-fg">same</strong> held-out test split,
+            the robust model scored <strong className="text-fg">92.3%</strong> versus the
+            baseline&apos;s 96.8% — heavy augmentation cost ~4.5 points on the benchmark.
+            Its goal was real-world robustness, but{" "}
+            <strong className="text-fg">
+              without a labelled real-world test set we cannot claim it actually helped
+              there
+            </strong>
+            , so the deployed model remains the baseline. We&apos;d rather ship the
+            honestly-better-measured model than the one we hoped was better.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

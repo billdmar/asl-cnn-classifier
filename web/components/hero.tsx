@@ -1,68 +1,49 @@
-"use client";
-
-import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { ArrowRight, Upload } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+/**
+ * Hero is the LCP content, so it is intentionally a Server Component with NO
+ * JS-driven entrance animation. The earlier framer-motion version rendered the
+ * hero text at opacity:0 until the framer-motion bundle hydrated and animated
+ * it in — which pushed LCP out to ~10s. We now render the text opaque from the
+ * server and use the JS-free CSS `fade-up` animation (tailwind keyframe, with
+ * `both` fill and a short stagger) purely as progressive enhancement. The text
+ * is paintable on first frame; the subtle motion runs without blocking LCP and
+ * is automatically disabled under `prefers-reduced-motion` via globals.css.
+ */
 export function Hero() {
-  const reduceMotion = useReducedMotion();
-
-  // When the user prefers reduced motion, render static (no offset, no stagger).
-  const container: Variants = {
-    hidden: {},
-    show: {
-      transition: reduceMotion ? {} : { staggerChildren: 0.08 },
-    },
-  };
-  const item: Variants = reduceMotion
-    ? { hidden: { opacity: 1 }, show: { opacity: 1 } }
-    : {
-        hidden: { opacity: 0, y: 12 },
-        show: {
-          opacity: 1,
-          y: 0,
-          transition: { duration: 0.4, ease: "easeOut" },
-        },
-      };
-
   return (
     <section
       id="top"
       className="relative overflow-hidden bg-accent-radial"
       aria-labelledby="hero-heading"
     >
-      <motion.div
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="mx-auto flex max-w-3xl flex-col items-center px-6 py-24 text-center sm:py-32"
-      >
-        <motion.div variants={item}>
+      <div className="mx-auto flex max-w-3xl flex-col items-center px-6 py-24 text-center sm:py-32">
+        <div className="animate-fade-up [animation-delay:0ms]">
           <Badge variant="accent">In-browser · privacy-first</Badge>
-        </motion.div>
+        </div>
 
-        <motion.h1
+        {/*
+         * LCP-critical: no entrance animation and no transform on these two
+         * elements, so they paint at the first frame and Largest Contentful
+         * Paint fires immediately (transforms/opacity transitions on the LCP
+         * node inflate "render delay" under Lighthouse's throttled trace).
+         */}
+        <h1
           id="hero-heading"
-          variants={item}
           className="mt-6 text-balance bg-accent-gradient bg-clip-text text-4xl font-bold leading-tight text-transparent sm:text-6xl"
         >
           Read sign language in your browser
-        </motion.h1>
+        </h1>
 
-        <motion.p
-          variants={item}
-          className="mt-6 max-w-2xl text-pretty text-lg text-fg-muted"
-        >
+        <p className="mt-6 max-w-2xl text-pretty text-lg text-fg-muted">
           100% in-browser inference · webcam frames never leave your device · MobileNetV2,
           96.8% held-out test accuracy.
-        </motion.p>
+        </p>
 
-        <motion.div
-          variants={item}
-          className="mt-8 flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row"
-        >
+        <div className="mt-8 flex w-full animate-fade-up flex-col items-center gap-3 [animation-delay:240ms] sm:w-auto sm:flex-row">
           <a href="#live" className="w-full sm:w-auto">
             <Button size="lg" className="w-full sm:w-auto">
               Try the live demo
@@ -75,9 +56,9 @@ export function Hero() {
               Upload an image
             </Button>
           </a>
-        </motion.div>
+        </div>
 
-        <motion.p variants={item} className="mt-6 text-sm text-fg-subtle">
+        <p className="mt-6 animate-fade-up text-sm text-fg-subtle [animation-delay:320ms]">
           Real-world webcam accuracy is lower than the benchmark —{" "}
           <a
             href="#how"
@@ -86,8 +67,8 @@ export function Hero() {
             see How it works
           </a>
           .
-        </motion.p>
-      </motion.div>
+        </p>
+      </div>
     </section>
   );
 }
