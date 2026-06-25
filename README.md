@@ -105,30 +105,36 @@ make install
 
 ## Results
 
-> **Accuracy status — read this.** Two numbers, both real and reproduced, and
-> the distinction matters. **Same-dataset** accuracy (train and test from the
-> same source) is **97.3%** — easy and inflated, because the test images look
-> like the training images. The **honest** number is **cross-dataset accuracy:
-> 47.6%** on a *different* dataset ([`EitanG98/asl_letters`](https://huggingface.co/datasets/EitanG98/asl_letters),
-> different signers and real backgrounds) that the model never trained on —
-> measured with `make eval-realworld-diverse`. This is the number that reflects
-> how the model performs on a stranger's hand. It rose from **33.4% → 47.6%
-> (+14.2 pts)** when training added a second, genuinely diverse dataset
-> ([`aliciiavs/sign_language_image_dataset`](https://huggingface.co/datasets/aliciiavs/sign_language_image_dataset)) —
-> see [`docs/EXPERIMENT_diverse_multisource.md`](docs/EXPERIMENT_diverse_multisource.md)
-> for the full investigation (including the preprocessing levers that were
-> measured and found *not* to help). Reproduce with `make download-real &&
-> make download-diverse && make check-overlap && make train-diverse &&
-> make eval-realworld-diverse` (~45 min on Apple-Silicon MPS).
+> **Accuracy status — read this.** Numbers are real and reproduced, and the
+> distinction matters. **Same-dataset** accuracy (train and test from the same
+> sources) is **96.9%** — easy and inflated, because the test images look like the
+> training images. The **honest** number is **cross-dataset accuracy on a
+> *different* dataset** the model never trained on
+> ([`EitanG98/asl_letters`](https://huggingface.co/datasets/EitanG98/asl_letters),
+> different signers and real backgrounds): **59.8% on the 24-letter A–Y headline**
+> (excluding J and Z, which are *dynamic motion signs* a single static frame
+> cannot capture — the mainstream convention, e.g. Sign Language MNIST), or
+> **55.5% across all 26 classes**. This is how the model does on a stranger's
+> hand. It climbed **33.4% → 47.6% → 55.5%** as training added genuinely diverse
+> datasets ([`aliciiavs/sign_language_image_dataset`](https://huggingface.co/datasets/aliciiavs/sign_language_image_dataset)
+> then [`Hemg/sign_language_dataset`](https://huggingface.co/datasets/Hemg/sign_language_dataset)),
+> while preprocessing and inference-time tricks (crop, sketch-clean, augmentation,
+> per-class thresholds, TTA, temperature) were all measured and found *not* to
+> help — see [`docs/`](docs/) for the full honest investigation. Reproduce with
+> `make download-real && make download-diverse && make download-hemg &&
+> make check-overlap-hemg && make train-diverse-hemg && make eval-realworld-diverse-hemg`
+> (~50 min on Apple-Silicon MPS).
 
 | Metric | Value | Source |
 | --- | --- | --- |
-| **Honest cross-dataset accuracy (different signers/backgrounds)** | **47.6%** | **measured** (`make eval-realworld-diverse`, 712 images, EitanG98 — a dataset never trained on) |
-| Cross-dataset macro F1 — same | **0.468** | measured |
-| Test accuracy — MobileNetV2, merged real datasets (26 classes, held-out test) | **97.3%** | measured (`make eval-real` on the merged train split, 2,898 test images) |
-| Macro F1 — same-dataset held-out | **0.972** | measured |
-| Validation accuracy (best epoch) | **96.1%** | measured during `make train-diverse` |
-| Expected Calibration Error (ECE, 10 bins) | **0.030** | measured (`make calibration`, held-out test split, T=1.0) |
+| **Honest cross-dataset accuracy, A–Y headline (no dynamic J/Z)** | **59.8%** | **measured** (`make eval-realworld-diverse-hemg`, EitanG98 — never trained on) |
+| Cross-dataset macro F1 — A–Y | **0.603** | measured |
+| Honest cross-dataset accuracy — full 26 classes (incl. J/Z) | **55.5%** | measured |
+| Cross-dataset macro F1 — 26 classes | **0.548** | measured |
+| Test accuracy — MobileNetV2, merged real datasets (26 classes, held-out test) | **96.9%** | measured (`make eval-real` on the merged train split, 3,170 test images) |
+| Macro F1 — same-dataset held-out | **0.969** | measured |
+| Validation accuracy (best epoch) | **97.3%** | measured during `make train-diverse-hemg` |
+| Expected Calibration Error (ECE, 10 bins) | **0.025** | measured (`make calibration`, held-out test split, T=1.0) |
 | Test accuracy — MobileNetV2, full 29-class Kaggle set | ≥98% (target) | aspirational |
 | Custom-CNN parameters | **656,829** | measured (`tests/test_model.py` asserts this) |
 | CPU inference latency (mean) | **5.08 ms/frame** | measured, this machine |
@@ -289,16 +295,20 @@ visualized in `artifacts/confusion_matrix.png`.
 
 ## Real-world caveat
 
-Same-dataset accuracy (97.3%) is measured on held-out images that resemble the
+Same-dataset accuracy (96.9%) is measured on held-out images that resemble the
 training set (similar signers, lighting, backgrounds). **Real-world accuracy is
-lower** — the honest cross-dataset number is **47.6%** on different signers and
-real backgrounds, and it still varies with lighting, skin tone, background
-clutter, and camera angle. That gap (and how diverse training data closed part
-of it, while preprocessing tweaks did not) is documented in
-[`docs/EXPERIMENT_diverse_multisource.md`](docs/EXPERIMENT_diverse_multisource.md)
+lower** — the honest cross-dataset number is **59.8% (A–Y) / 55.5% (26-class)**
+on different signers and real backgrounds, and it still varies with lighting,
+skin tone, background clutter, and camera angle. That gap (and how stacking
+diverse training datasets closed it from 33.4% → 55.5%, while preprocessing and
+inference-time tricks did not move it) is documented in
+[`docs/EXPERIMENT_diverse_multisource.md`](docs/EXPERIMENT_diverse_multisource.md),
+[`docs/EXPERIMENT_data_diversity_scaling.md`](docs/EXPERIMENT_data_diversity_scaling.md),
 and [`docs/EXPERIMENT_crop_consistent_retrain.md`](docs/EXPERIMENT_crop_consistent_retrain.md).
-J and Z (motion signs) remain weak — a single static frame cannot capture them.
-See [`MODEL_CARD.md`](MODEL_CARD.md) for limitations and ethical considerations.
+J and Z are *dynamic motion signs* — a single static frame cannot fully capture
+them, so they are excluded from the A–Y headline (mainstream convention) and
+reported separately. See [`MODEL_CARD.md`](MODEL_CARD.md) for limitations and
+ethical considerations.
 
 ## Project layout
 
