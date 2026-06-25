@@ -34,6 +34,22 @@ def test_resnet18_forward_shape():
     assert tuple(out.shape) == (BATCH, NUM_CLASSES)
 
 
+@pytest.mark.parametrize("arch", ["mobilenet_v3_small", "efficientnet_b0"])
+def test_new_transfer_arches_forward_and_freeze(arch):
+    model = build_model(arch, pretrained=False)
+    assert isinstance(model, TransferModel)
+    out = model(torch.randn(*INPUT))
+    assert tuple(out.shape) == (BATCH, NUM_CLASSES)
+    # Freeze isolates the head: non-head frozen, head trainable.
+    model.freeze_backbone()
+    head_ids = model._head_param_ids
+    non_head = [p for p in model.backbone.parameters() if id(p) not in head_ids]
+    head = [p for p in model.backbone.parameters() if id(p) in head_ids]
+    assert non_head and head
+    assert all(not p.requires_grad for p in non_head)
+    assert all(p.requires_grad for p in head)
+
+
 def test_custom_cnn_param_count_in_band():
     # Guards the README's ~656,829-parameter figure from silent drift.
     model = build_model("custom_cnn")

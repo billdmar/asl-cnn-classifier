@@ -1,0 +1,39 @@
+# Training configuration — 3-SOURCE + CLASS-BALANCED loss (Experiment D4).
+#
+# Same 3-source union and recipe as the deployed D3, but with inverse-frequency
+# class weighting in the loss. D3 still over-predicts a "sink" class (S: recall
+# 0.87, precision 0.34; T/A/E/J collapse into it). Class-balanced loss attacks
+# that bias at the source rather than masking it at decision time. Gated on the
+# cross-dataset metric vs the deployed D3 (55.5% / A-Y 59.8%).
+
+data_dir:
+  - data/asl_real
+  - data/asl_diverse
+  - data/asl_hemg
+image_size: 128
+train_frac: 0.70
+val_frac: 0.15
+test_frac: 0.15
+
+arch: mobilenet_v2
+num_classes: 26
+pretrained: true
+
+batch_size: 64
+num_epochs: 12
+learning_rate: 0.001
+weight_decay: 0.0001
+optimizer: adamw
+lr_scheduler: cosine
+warmup_epochs: 3
+
+seed: 42
+num_workers: 4
+amp: false
+early_stopping_patience: 5
+device: auto
+augmentation: standard
+class_weights: auto
+
+checkpoint_dir: artifacts/checkpoints_diverse_hemg_balanced
+tensorboard_dir: artifacts/runs

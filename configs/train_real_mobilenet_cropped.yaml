@@ -1,0 +1,45 @@
+# Training configuration — CROP-CONSISTENT MobileNetV2 fine-tune (Experiment A).
+#
+# Identical recipe to configs/train_real_mobilenet.yaml, but trained on the
+# MediaPipe hand-CROPPED dataset (data/asl_real_cropped, built by
+# `make precrop`) instead of raw frames. The deployed model is served hand-crops
+# in the browser (web/lib/handcrop.ts) but was trained on uncropped frames; this
+# config closes that train/serve distribution mismatch — the #1 fixable cause of
+# the cross-dataset accuracy collapse (96.8% benchmark vs 33.4% real-world).
+#
+# Standard augmentation (NOT heavy) so this isolates the crop-consistency lever.
+# Checkpoints go to a SEPARATE dir to protect the deployed baseline. Judge only
+# on `make eval-realworld-cropped` (cross-dataset), never the clean benchmark.
+
+# Data
+data_dir: data/asl_real_cropped
+image_size: 128
+train_frac: 0.70
+val_frac: 0.15
+test_frac: 0.15
+
+# Model
+arch: mobilenet_v2
+num_classes: 26           # A-Z (this dataset has no del/nothing/space)
+pretrained: true
+
+# Optimization
+batch_size: 64
+num_epochs: 12
+learning_rate: 0.001      # head LR during warm-up
+weight_decay: 0.0001
+optimizer: adamw
+lr_scheduler: cosine
+warmup_epochs: 3          # epochs with frozen backbone before fine-tuning
+
+# Training behavior
+seed: 42
+num_workers: 4
+amp: false                # auto-disabled on non-CUDA devices
+early_stopping_patience: 5
+device: auto
+augmentation: standard
+
+# Output — SEPARATE dir; never clobber the deployed artifacts/checkpoints.
+checkpoint_dir: artifacts/checkpoints_cropped
+tensorboard_dir: artifacts/runs

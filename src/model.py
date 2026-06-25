@@ -20,7 +20,12 @@ from __future__ import annotations
 import torch
 from torch import nn
 from torchvision import models
-from torchvision.models import MobileNet_V2_Weights, ResNet18_Weights
+from torchvision.models import (
+    EfficientNet_B0_Weights,
+    MobileNet_V2_Weights,
+    MobileNet_V3_Small_Weights,
+    ResNet18_Weights,
+)
 
 
 class CustomCNN(nn.Module):
@@ -130,9 +135,27 @@ class TransferModel(nn.Module):
             in_features = self.backbone.fc.in_features
             self.backbone.fc = nn.Linear(in_features, num_classes)
             self._head_param_ids = {id(p) for p in self.backbone.fc.parameters()}
+        elif arch == "mobilenet_v3_small":
+            weights = MobileNet_V3_Small_Weights.IMAGENET1K_V1 if pretrained else None
+            self.backbone = models.mobilenet_v3_small(weights=weights)
+            # Final classifier Linear is classifier[-1] (a small head MLP precedes it).
+            in_features = self.backbone.classifier[-1].in_features
+            self.backbone.classifier[-1] = nn.Linear(in_features, num_classes)
+            self._head_param_ids = {
+                id(p) for p in self.backbone.classifier[-1].parameters()
+            }
+        elif arch == "efficientnet_b0":
+            weights = EfficientNet_B0_Weights.IMAGENET1K_V1 if pretrained else None
+            self.backbone = models.efficientnet_b0(weights=weights)
+            in_features = self.backbone.classifier[-1].in_features
+            self.backbone.classifier[-1] = nn.Linear(in_features, num_classes)
+            self._head_param_ids = {
+                id(p) for p in self.backbone.classifier[-1].parameters()
+            }
         else:
             raise ValueError(
-                f"Unsupported transfer arch '{arch}'. Expected 'mobilenet_v2' or 'resnet18'."
+                f"Unsupported transfer arch '{arch}'. Expected one of: "
+                "mobilenet_v2, resnet18, mobilenet_v3_small, efficientnet_b0."
             )
 
     def freeze_backbone(self) -> None:
@@ -156,7 +179,8 @@ def build_model(
     """Construct a model by architecture name.
 
     Args:
-        arch: One of ``"custom_cnn"``, ``"mobilenet_v2"``, ``"resnet18"``.
+        arch: One of ``"custom_cnn"``, ``"mobilenet_v2"``, ``"resnet18"``,
+            ``"mobilenet_v3_small"``, ``"efficientnet_b0"``.
         num_classes: Number of output logits.
         pretrained: Whether transfer backbones load ImageNet weights (ignored
             for ``custom_cnn``).
@@ -169,8 +193,14 @@ def build_model(
     """
     if arch == "custom_cnn":
         return CustomCNN(num_classes=num_classes)
-    if arch in ("mobilenet_v2", "resnet18"):
+    if arch in (
+        "mobilenet_v2",
+        "resnet18",
+        "mobilenet_v3_small",
+        "efficientnet_b0",
+    ):
         return TransferModel(arch=arch, num_classes=num_classes, pretrained=pretrained)
     raise ValueError(
-        f"Unknown arch '{arch}'. Expected 'custom_cnn', 'mobilenet_v2', or 'resnet18'."
+        f"Unknown arch '{arch}'. Expected 'custom_cnn', 'mobilenet_v2', "
+        "'resnet18', 'mobilenet_v3_small', or 'efficientnet_b0'."
     )

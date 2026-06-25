@@ -1,0 +1,12 @@
+Top-10 most-confused class pairs (true -> pred: count)
+
+M -> N: 9
+T -> N: 6
+N -> M: 4
+S -> E: 4
+B -> F: 3
+R -> K: 3
+R -> X: 3
+U -> R: 3
+W -> V: 3
+C -> E: 2

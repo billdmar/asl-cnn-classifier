@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from collections.abc import Sequence
 from pathlib import Path
 
 import torch
@@ -36,13 +37,90 @@ IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
 
-def get_train_transforms(image_size: int = IMAGE_SIZE) -> transforms.Compose:
+# Valid training-augmentation regimes, weakest → strongest. See
+# :func:`get_train_transforms` for what each applies.
+AUG_REGIMES = ("standard", "medium", "heavy")
+
+
+def get_train_transforms(
+    image_size: int = IMAGE_SIZE,
+    heavy: bool = False,
+    regime: str | None = None,
+) -> transforms.Compose:
     """Augmentation pipeline for training.
 
     NOTE: deliberately **no horizontal flip** — ASL signs are not
     flip-invariant (e.g. b/d, p/q are mirror images, and several letters differ
     only by orientation). Flipping would create mislabeled training data.
+
+    Three regimes, weakest → strongest:
+
+    * ``standard`` — mild crop/rotation/affine + light color jitter. The default,
+      used for the deployed clean-data fine-tune.
+    * ``medium`` — a middle ground for *crop-consistent* training: wider geometric
+      jitter and stronger color jitter than standard, plus light random erasing,
+      but deliberately **no grayscale or blur** (those most damage an already-tight
+      hand crop, where the discriminative fingers fill the frame).
+    * ``heavy`` — aggressive domain augmentation (grayscale, Gaussian blur,
+      stronger erasing) meant to make the *training* distribution look like a
+      cluttered webcam. Lowers the clean benchmark; judged on cross-dataset only.
+
+    The eval transform stays untouched so the held-out metric is comparable.
+
+    Args:
+        image_size: Output side length.
+        heavy: Back-compat shorthand for ``regime="heavy"``. Ignored when
+            ``regime`` is given explicitly.
+        regime: One of :data:`AUG_REGIMES`. When ``None``, falls back to
+            ``"heavy"`` if ``heavy`` else ``"standard"``.
     """
+    if regime is None:
+        regime = "heavy" if heavy else "standard"
+    if regime not in AUG_REGIMES:
+        raise ValueError(
+            f"unknown augmentation regime {regime!r}; expected one of {AUG_REGIMES}"
+        )
+
+    if regime == "heavy":
+        return transforms.Compose(
+            [
+                transforms.RandomResizedCrop(
+                    image_size, scale=(0.6, 1.0), ratio=(0.8, 1.25)
+                ),
+                transforms.RandomRotation(25),
+                transforms.RandomAffine(
+                    degrees=0, translate=(0.18, 0.18), scale=(0.8, 1.2), shear=12
+                ),
+                transforms.ColorJitter(
+                    brightness=0.5, contrast=0.5, saturation=0.4, hue=0.08
+                ),
+                transforms.RandomGrayscale(p=0.15),
+                transforms.RandomApply(
+                    [transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))], p=0.3
+                ),
+                transforms.ToTensor(),
+                transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+                transforms.RandomErasing(p=0.25, scale=(0.02, 0.15)),
+            ]
+        )
+    if regime == "medium":
+        return transforms.Compose(
+            [
+                transforms.RandomResizedCrop(
+                    image_size, scale=(0.75, 1.0), ratio=(0.85, 1.18)
+                ),
+                transforms.RandomRotation(20),
+                transforms.RandomAffine(
+                    degrees=0, translate=(0.14, 0.14), scale=(0.85, 1.15), shear=8
+                ),
+                transforms.ColorJitter(
+                    brightness=0.4, contrast=0.4, saturation=0.3, hue=0.06
+                ),
+                transforms.ToTensor(),
+                transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+                transforms.RandomErasing(p=0.15, scale=(0.02, 0.10)),
+            ]
+        )
     return transforms.Compose(
         [
             transforms.RandomResizedCrop(image_size, scale=(0.85, 1.0)),
@@ -87,6 +165,24 @@ def get_class_names(root_dir: str | Path | None = None) -> list[str]:
         if found:
             return found
     return list(CLASS_NAMES)
+
+
+def get_union_class_names(root_dirs: Sequence[str | Path]) -> list[str]:
+    """Return the sorted union of class-folder names across several dataset dirs.
+
+    Used for multi-source (merged-dataset) training: the label↔index map must
+    cover every class present in *any* source. E.g. merging a 26-class A–Z set
+    with a 24-class A–Y set yields the full A–Z (the first set supplies J/Z);
+    :func:`_list_samples` simply contributes zero samples for a class a given dir
+    lacks, so there is no label drift. Falls back to the canonical
+    :data:`CLASS_NAMES` if no class folders are found in any dir.
+    """
+    found: set[str] = set()
+    for d in root_dirs:
+        p = Path(d)
+        if p.is_dir():
+            found.update(child.name for child in p.iterdir() if child.is_dir())
+    return sorted(found) if found else list(CLASS_NAMES)
 
 
 def _list_samples(
@@ -143,30 +239,179 @@ class ASLDataset(Dataset):
         return tensor, label, filepath
 
 
+# Default perceptual-hash Hamming distance under which two frames are treated as
+# near-duplicates of one another. This is a *heuristic*, not a validated optimum:
+# on the real ~11k-frame set a sweep shows no flat plateau, and >=28 collapses
+# whole classes into one cluster. 22 sits below that cliff and yields plausible
+# session-sized clusters (largest ~50 frames), so it removes obvious leakage
+# without over-merging. Re-tune properly if per-recording/session labels ever
+# become available to ground-truth against. Connected components of the
+# near-duplicate graph become atomic groups that never straddle splits.
+DEDUP_PHASH_THRESHOLD = 22
+
+# Each frame is only compared against this many subsequent frames within the same
+# class (after natural-sorting frames into sequence). The dataset is sequential
+# video, so a recording's near-duplicates are neighbours — this keeps clustering
+# O(n·window) instead of O(n²) on the ~11k-image real set. A wider window links
+# more (largest cluster grows past window 8), so 8 is a compute/coverage tradeoff
+# that catches contiguous runs while staying cheap, not an exhaustive linker.
+DEDUP_WINDOW = 8
+
+
+def _frame_sort_key(filepath: str) -> tuple[int, str]:
+    """Natural-order key so frames sort 0,1,2,…,10 (true video sequence).
+
+    The dataset names frames numerically (``0.png``, ``1.png``, …), but a plain
+    lexical sort orders them ``0,1,10,100,2,…`` — scattering true consecutive
+    frames ~100 positions apart so the windowed scan misses them. Sorting on the
+    leading integer restores sequence; names without a number fall back to a
+    stable lexical tail so the key is always total and deterministic.
+    """
+    import re
+
+    nums = re.findall(r"\d+", Path(filepath).name)
+    return (int(nums[0]) if nums else -1, filepath)
+
+
+def _phash_groups(
+    samples: list[tuple[str, int]],
+    threshold: int = DEDUP_PHASH_THRESHOLD,
+    window: int = DEDUP_WINDOW,
+) -> list[int]:
+    """Cluster near-duplicate frames into atomic groups via perceptual hashing.
+
+    Builds a near-duplicate graph: within each class, every frame is linked to a
+    later frame when their perceptual-hash (pHash) Hamming distance is ``<=
+    threshold``. The connected components of that graph are the groups returned
+    here (one integer group id per input sample, aligned to ``samples`` order).
+
+    Because the real dataset is sequential video — each class is a concatenation
+    of recording sessions whose frames are mutual near-duplicates — frames are
+    first natural-sorted into sequence (see :func:`_frame_sort_key`; the caller's
+    lexical order scatters true neighbours), then comparing only the next
+    ``window`` frames inside a class chains a session into one component without
+    an O(n^2) all-pairs scan. Group ids are still aligned to the input
+    ``samples`` order — only the internal comparison order is natural-sorted.
+
+    Args:
+        samples: ``(filepath, label)`` tuples in a deterministic order.
+        threshold: Max pHash Hamming distance counted as a near-duplicate edge.
+        window: Number of subsequent same-class frames each frame is compared to.
+
+    Returns:
+        A list of group ids, ``group_ids[i]`` for ``samples[i]``. Frames in the
+        same near-duplicate cluster share an id; isolated frames get unique ids.
+    """
+    import imagehash  # local import: only needed on the opt-in dedup path.
+
+    n = len(samples)
+    hashes = [
+        imagehash.phash(Image.open(filepath).convert("RGB"))
+        for filepath, _label in samples
+    ]
+
+    parent = list(range(n))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    # Indices grouped by class, natural-sorted into true frame sequence so the
+    # window scan compares actual neighbours (not lexical 0,1,10,100,… order).
+    by_label: dict[int, list[int]] = {}
+    for idx, (_filepath, label) in enumerate(samples):
+        by_label.setdefault(label, []).append(idx)
+    for indices in by_label.values():
+        indices.sort(key=lambda i: _frame_sort_key(samples[i][0]))
+
+    for indices in by_label.values():
+        for pos, i in enumerate(indices):
+            for j in indices[pos + 1 : pos + 1 + window]:
+                if hashes[i] - hashes[j] <= threshold:
+                    union(i, j)
+
+    # Re-map roots to small contiguous group ids for readability/reproducibility.
+    root_to_group: dict[int, int] = {}
+    group_ids: list[int] = []
+    for i in range(n):
+        root = find(i)
+        if root not in root_to_group:
+            root_to_group[root] = len(root_to_group)
+        group_ids.append(root_to_group[root])
+    return group_ids
+
+
 def make_stratified_splits(
-    root_dir: str | Path,
+    root_dir: str | Path | None = None,
     train_frac: float = 0.70,
     val_frac: float = 0.15,
     test_frac: float = 0.15,
     seed: int = 42,
     class_names: list[str] | None = None,
+    dedup: bool = False,
+    dedup_threshold: int = DEDUP_PHASH_THRESHOLD,
+    samples: list[tuple[str, int]] | None = None,
 ) -> tuple[list[tuple[str, int]], list[tuple[str, int]], list[tuple[str, int]]]:
     """Split dataset files into train/val/test, stratified by class label.
 
     Splitting happens at the **file** level (not batch level) so no augmented
     view of an image can leak across splits. Returns three lists of
     ``(filepath, label)`` tuples.
+
+    Leakage caveat (why ``dedup`` exists): the file-level random split is
+    *honest only when files are independent*. The real dataset is sequential
+    video — a class folder holds long runs of near-duplicate frames from the
+    same signer/session — so a random split scatters a frame into train and its
+    near-twin into test, inflating the test metric. Set ``dedup=True`` to make
+    near-duplicate frames an atomic group (clustered by perceptual hash) that is
+    assigned to a single split, so no frame and its near-twin ever straddle
+    train/test. This lowers the headline number but makes it trustworthy.
+
+    Args:
+        root_dir: A single class-folder dataset root. Ignored when ``samples`` is
+            given. Required (with ``samples=None``) for the original behavior.
+        dedup: When ``True``, cluster near-duplicate frames (perceptual hash) and
+            keep every cluster wholly within one split (group-aware split). When
+            ``False`` (default) the behavior is the original file-level random
+            split — byte-identical to before, so existing repro is unchanged.
+        dedup_threshold: pHash Hamming distance under which two frames are
+            near-duplicates. Only used when ``dedup=True``.
+        samples: A pre-computed ``(filepath, label)`` list to split directly,
+            bypassing ``root_dir``/``_list_samples``. Used for multi-source
+            (merged-dataset) training where samples come from several dirs. When
+            ``None`` (default) samples are listed from ``root_dir`` exactly as
+            before — so the single-source path is unchanged.
     """
     if abs(train_frac + val_frac + test_frac - 1.0) > 1e-6:
         raise ValueError("train/val/test fractions must sum to 1.0")
 
-    class_names = class_names or get_class_names(root_dir)
-    samples = _list_samples(root_dir, class_names)
+    if samples is None:
+        if root_dir is None:
+            raise ValueError("Provide either root_dir or samples.")
+        class_names = class_names or get_class_names(root_dir)
+        samples = _list_samples(root_dir, class_names)
     if not samples:
         raise RuntimeError(f"No images found under {root_dir}")
 
     files = [s[0] for s in samples]
     labels = [s[1] for s in samples]
+
+    if dedup:
+        return _make_grouped_splits(
+            samples,
+            train_frac=train_frac,
+            val_frac=val_frac,
+            test_frac=test_frac,
+            seed=seed,
+            dedup_threshold=dedup_threshold,
+        )
 
     # First split: train vs (val+test).
     sss1 = StratifiedShuffleSplit(
@@ -185,6 +430,51 @@ def make_stratified_splits(
     train = [(files[i], labels[i]) for i in train_idx]
     val = [(rest_files[i], rest_labels[i]) for i in val_idx]
     test = [(rest_files[i], rest_labels[i]) for i in test_idx]
+    return train, val, test
+
+
+def _make_grouped_splits(
+    samples: list[tuple[str, int]],
+    train_frac: float,
+    val_frac: float,
+    test_frac: float,
+    seed: int,
+    dedup_threshold: int,
+) -> tuple[list[tuple[str, int]], list[tuple[str, int]], list[tuple[str, int]]]:
+    """Group-aware train/val/test split: no near-duplicate cluster straddles splits.
+
+    Near-duplicate frames are clustered with :func:`_phash_groups` and the whole
+    cluster is assigned to one split via :class:`GroupShuffleSplit` (two stages,
+    mirroring the stratified path). Splitting on groups — not files — is what
+    removes the train/test leakage. Stratification by class is best-effort: the
+    grouped split is keyed on clusters, but groups are class-pure here (clusters
+    only link same-class frames), so class balance is preserved at the group
+    level.
+
+    Returns the same ``(filepath, label)`` contract as
+    :func:`make_stratified_splits`.
+    """
+    from sklearn.model_selection import GroupShuffleSplit
+
+    groups = _phash_groups(samples, threshold=dedup_threshold)
+
+    # First split: train-groups vs (val+test)-groups.
+    gss1 = GroupShuffleSplit(
+        n_splits=1, test_size=val_frac + test_frac, random_state=seed
+    )
+    train_idx, rest_idx = next(gss1.split(samples, groups=groups))
+
+    rest_samples = [samples[i] for i in rest_idx]
+    rest_groups = [groups[i] for i in rest_idx]
+
+    # Second split: divide the remainder groups into val vs test.
+    test_share = test_frac / (val_frac + test_frac)
+    gss2 = GroupShuffleSplit(n_splits=1, test_size=test_share, random_state=seed)
+    val_idx, test_idx = next(gss2.split(rest_samples, groups=rest_groups))
+
+    train = [samples[i] for i in train_idx]
+    val = [rest_samples[i] for i in val_idx]
+    test = [rest_samples[i] for i in test_idx]
     return train, val, test
 
 

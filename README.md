@@ -21,10 +21,34 @@ analysis.
 
 ## Live demo
 
-A [Gradio](https://gradio.app) app (`app.py`) lets you upload a hand-sign image
-and see the predicted class plus top-5 probabilities.
+### 👉 [**asl-cnn-classifier.vercel.app**](https://asl-cnn-classifier.vercel.app)
 
-### 👉 [**Try it live on Hugging Face Spaces**](https://huggingface.co/spaces/billdmar/asl-cnn-classifier)
+The flagship demo is a **polished in-browser website** (`web/`, Next.js +
+TypeScript) that runs the real MobileNetV2 model **100% client-side** via
+onnxruntime-web — live webcam classification with MediaPipe hand-crop, image
+upload, an interactive metrics dashboard wired to the real artifacts, and a
+model-card/story page. Webcam frames never leave the browser. It deploys as a
+static site to Vercel; see [`web/README.md`](web/README.md) and
+[`web/DEPLOY.md`](web/DEPLOY.md).
+
+```bash
+cd web && npm install && npm run dev    # http://localhost:3000
+```
+
+What makes it trustworthy: a **cross-language preprocessing parity gate** proves
+the browser path reproduces the Python pipeline's predictions (strict tensor
+parity ~5e-7), and every displayed number is produced by reproducible code and
+labeled benchmark-vs-real-world. CI enforces TypeScript-strict, lint, unit +
+parity tests, Playwright E2E (including a real in-browser inference assertion),
+and a Lighthouse budget (performance 98 / accessibility 96, gated ≥90).
+
+### Legacy Gradio demo
+
+A [Gradio](https://gradio.app) app (`app.py`) also lets you upload a hand-sign
+image and see the predicted class plus top-5 probabilities — the optional legacy
+backend the website does not depend on.
+
+### 👉 [**Try the Gradio app on Hugging Face Spaces**](https://huggingface.co/spaces/billdmar/asl-cnn-classifier)
 
 ![ASL CNN Gradio demo](docs/demo.png)
 
@@ -81,21 +105,36 @@ make install
 
 ## Results
 
-> **Accuracy status — read this.** The headline number below is **real and
-> reproduced**: a MobileNetV2 transfer model was trained on a real ASL hand-sign
-> dataset ([`Marxulia/asl_sign_languages_alphabets_v03`](https://huggingface.co/datasets/Marxulia/asl_sign_languages_alphabets_v03),
-> 26 classes A–Z, ~10.9k images, downloadable with `make download-real` — **no
-> Kaggle account needed**) and scored on its held-out test split. Reproduce with
-> `make download-real && make train-real && make eval-real` (~35 min on
-> Apple-Silicon MPS). The original ≥98% figure on the 29-class Kaggle dataset
-> remains an aspirational target (that dataset also includes *space/del/nothing*);
-> this 26-letter result is what is actually demonstrated here.
+> **Accuracy status — read this.** Numbers are real and reproduced, and the
+> distinction matters. **Same-dataset** accuracy (train and test from the same
+> sources) is **96.9%** — easy and inflated, because the test images look like the
+> training images. The **honest** number is **cross-dataset accuracy on a
+> *different* dataset** the model never trained on
+> ([`EitanG98/asl_letters`](https://huggingface.co/datasets/EitanG98/asl_letters),
+> different signers and real backgrounds): **59.8% on the 24-letter A–Y headline**
+> (excluding J and Z, which are *dynamic motion signs* a single static frame
+> cannot capture — the mainstream convention, e.g. Sign Language MNIST), or
+> **55.5% across all 26 classes**. This is how the model does on a stranger's
+> hand. It climbed **33.4% → 47.6% → 55.5%** as training added genuinely diverse
+> datasets ([`aliciiavs/sign_language_image_dataset`](https://huggingface.co/datasets/aliciiavs/sign_language_image_dataset)
+> then [`Hemg/sign_language_dataset`](https://huggingface.co/datasets/Hemg/sign_language_dataset)),
+> while preprocessing and inference-time tricks (crop, sketch-clean, augmentation,
+> per-class thresholds, TTA, temperature) were all measured and found *not* to
+> help — see [`docs/`](docs/) for the full honest investigation. Reproduce with
+> `make download-real && make download-diverse && make download-hemg &&
+> make check-overlap-hemg && make train-diverse-hemg && make eval-realworld-diverse-hemg`
+> (~50 min on Apple-Silicon MPS).
 
 | Metric | Value | Source |
 | --- | --- | --- |
-| **Test accuracy — MobileNetV2, real ASL dataset (26 classes, held-out test)** | **96.8%** | **measured** (`make eval-real`, 1,631 test images) |
-| Macro F1 — same | **0.968** | measured |
-| Validation accuracy (best epoch) | **97.8%** | measured during `make train-real` |
+| **Honest cross-dataset accuracy, A–Y headline (no dynamic J/Z)** | **59.8%** | **measured** (`make eval-realworld-diverse-hemg`, EitanG98 — never trained on) |
+| Cross-dataset macro F1 — A–Y | **0.603** | measured |
+| Honest cross-dataset accuracy — full 26 classes (incl. J/Z) | **55.5%** | measured |
+| Cross-dataset macro F1 — 26 classes | **0.548** | measured |
+| Test accuracy — MobileNetV2, merged real datasets (26 classes, held-out test) | **96.9%** | measured (`make eval-real` on the merged train split, 3,170 test images) |
+| Macro F1 — same-dataset held-out | **0.969** | measured |
+| Validation accuracy (best epoch) | **97.3%** | measured during `make train-diverse-hemg` |
+| Expected Calibration Error (ECE, 10 bins) | **0.025** | measured (`make calibration`, held-out test split, T=1.0) |
 | Test accuracy — MobileNetV2, full 29-class Kaggle set | ≥98% (target) | aspirational |
 | Custom-CNN parameters | **656,829** | measured (`tests/test_model.py` asserts this) |
 | CPU inference latency (mean) | **5.08 ms/frame** | measured, this machine |
@@ -170,21 +209,31 @@ python -m src.infer_camera --source data/sample/A/0.png
 > no wheels for newer interpreters). Install uv with `brew install uv` or the
 > [standalone installer](https://docs.astral.sh/uv/getting-started/installation/).
 
-## Reproducing the 98% accuracy target
+## Reproducing the deployed model (55.5% honest cross-dataset)
 
-The sample subset cannot produce real accuracy. To train on the real data:
+The committed sample subset is only a wiring fixture — it can't produce real
+accuracy. The deployed model is a MobileNetV2 trained on the **union of three
+public, credential-free Hugging Face datasets** and judged on a **fourth** it
+never trains on. Full pipeline from a fresh checkout (~50 min on Apple-Silicon
+MPS):
 
 ```bash
-# Requires Kaggle API credentials at ~/.kaggle/kaggle.json (chmod 600).
-python -m src.download_data            # downloads grassknoted/asl-alphabet (~1GB)
-make train                             # full custom-CNN training
-# or the transfer variant that reliably hits >=98%:
-python -m src.train --config configs/train_mobilenet.yaml
-make eval                              # writes the real accuracy to metrics.json
+make download-real          # Marxulia (single signer, plain bg) — A–Z
+make download-diverse       # aliciiavs (multi-signer, real backgrounds) — A–Y
+make download-hemg          # Hemg (plain bg, includes J/Z)
+make download-crossval      # EitanG98 — the HELD-OUT eval gate (never trained on)
+make check-overlap-hemg     # perceptual-hash guard: 0% train↔eval contamination
+make train-diverse-hemg     # 3-source union → artifacts/checkpoints_diverse_hemg/
+make eval-realworld-diverse-hemg   # the honest number → realworld_eval_*.json
 ```
 
-On Apple-Silicon MPS, full training takes roughly **30–90 minutes**. After it
-finishes, update the Results table with the value from `artifacts/metrics.json`.
+The honest cross-dataset result lands in `artifacts/realworld_eval_diverse_hemg.json`
+(**55.5% all-26 / 59.8% A–Y headline**). The same-dataset benchmark (96.9%) comes
+from `make eval-real`. Everything is seeded (`seed: 42`) and the splits are
+file-level stratified, so runs are reproducible. The full journey — including the
+levers that were measured and rejected (crop-consistency, augmentation,
+calibration, class-balancing, two architecture swaps) — is documented honestly in
+[`docs/EXPERIMENT_*.md`](docs/).
 
 ## Architecture
 
@@ -256,10 +305,20 @@ visualized in `artifacts/confusion_matrix.png`.
 
 ## Real-world caveat
 
-98% is measured on the Kaggle benchmark, whose images are highly uniform
-(consistent signer, lighting, and background). **Real-world accuracy is lower**
-and varies with lighting, skin tone, background clutter, and camera angle. See
-[`MODEL_CARD.md`](MODEL_CARD.md) for limitations and ethical considerations.
+Same-dataset accuracy (96.9%) is measured on held-out images that resemble the
+training set (similar signers, lighting, backgrounds). **Real-world accuracy is
+lower** — the honest cross-dataset number is **59.8% (A–Y) / 55.5% (26-class)**
+on different signers and real backgrounds, and it still varies with lighting,
+skin tone, background clutter, and camera angle. That gap (and how stacking
+diverse training datasets closed it from 33.4% → 55.5%, while preprocessing and
+inference-time tricks did not move it) is documented in
+[`docs/EXPERIMENT_diverse_multisource.md`](docs/EXPERIMENT_diverse_multisource.md),
+[`docs/EXPERIMENT_data_diversity_scaling.md`](docs/EXPERIMENT_data_diversity_scaling.md),
+and [`docs/EXPERIMENT_crop_consistent_retrain.md`](docs/EXPERIMENT_crop_consistent_retrain.md).
+J and Z are *dynamic motion signs* — a single static frame cannot fully capture
+them, so they are excluded from the A–Y headline (mainstream convention) and
+reported separately. See [`MODEL_CARD.md`](MODEL_CARD.md) for limitations and
+ethical considerations.
 
 ## Project layout
 
