@@ -133,3 +133,28 @@ def test_dedup_is_deterministic(tmp_path):
     first = make_stratified_splits(root, dedup=True, seed=42)
     second = make_stratified_splits(root, dedup=True, seed=42)
     assert first == second
+
+
+def test_dedup_clustering_invariant_to_input_order(tmp_path):
+    """Clustering must be frame-sequence based, not input-order based.
+
+    The real dataset names frames numerically but _list_samples sorts them
+    lexically (0,1,10,100,…), scattering true neighbours. _phash_groups
+    natural-sorts internally, so shuffling the input must not change which
+    frames cluster together (only the group-id labels may be renumbered).
+    """
+    root, group_of = _make_duplicate_dataset(tmp_path)
+    samples = dataset._list_samples(root, dataset.get_class_names(root))
+
+    shuffled = list(reversed(samples))
+    base_ids = dataset._phash_groups(samples)
+    shuf_ids = dataset._phash_groups(shuffled)
+
+    def partition(sample_list, ids):
+        # frozenset of co-clustered files per group — order-independent identity.
+        members: dict[int, set[str]] = {}
+        for (fpath, _label), gid in zip(sample_list, ids):
+            members.setdefault(gid, set()).add(fpath)
+        return {frozenset(v) for v in members.values()}
+
+    assert partition(samples, base_ids) == partition(shuffled, shuf_ids)
