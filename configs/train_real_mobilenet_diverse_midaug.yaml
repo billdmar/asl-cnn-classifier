@@ -1,0 +1,46 @@
+# Training configuration — DIVERSE MULTI-SOURCE + MEDIUM augmentation (Exp. D2).
+#
+# D1 (diverse merge, standard aug) was a breakthrough: cross-dataset 47.6% vs the
+# 33.4% baseline (+14.2 pts), confirming the data-domain hypothesis. D2 pushes
+# further by adding the `medium` augmentation regime on top of the diverse merge.
+# Rationale: with genuinely diverse multi-signer data, augmentation reinforces
+# real invariances (rather than distorting a single domain as it did on the
+# single-signer set), so it may improve generalization beyond D1.
+#
+# Same union data + recipe as D1; only augmentation changes. Separate checkpoint
+# dir protects D1 + the deployed baseline. Judged on cross-dataset eval only.
+
+# Data — union of Marxulia (A-Z, supplies J/Z) + aliciiavs (A-Y, diverse).
+data_dir:
+  - data/asl_real
+  - data/asl_diverse
+image_size: 128
+train_frac: 0.70
+val_frac: 0.15
+test_frac: 0.15
+
+# Model
+arch: mobilenet_v2
+num_classes: 26
+pretrained: true
+
+# Optimization (deployed recipe)
+batch_size: 64
+num_epochs: 12
+learning_rate: 0.001
+weight_decay: 0.0001
+optimizer: adamw
+lr_scheduler: cosine
+warmup_epochs: 3
+
+# Training behavior
+seed: 42
+num_workers: 4
+amp: false
+early_stopping_patience: 5
+device: auto
+augmentation: medium
+
+# Output — SEPARATE dir; never clobber the deployed baseline or D1.
+checkpoint_dir: artifacts/checkpoints_diverse_midaug
+tensorboard_dir: artifacts/runs
