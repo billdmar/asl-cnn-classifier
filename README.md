@@ -209,21 +209,31 @@ python -m src.infer_camera --source data/sample/A/0.png
 > no wheels for newer interpreters). Install uv with `brew install uv` or the
 > [standalone installer](https://docs.astral.sh/uv/getting-started/installation/).
 
-## Reproducing the 98% accuracy target
+## Reproducing the deployed model (55.5% honest cross-dataset)
 
-The sample subset cannot produce real accuracy. To train on the real data:
+The committed sample subset is only a wiring fixture — it can't produce real
+accuracy. The deployed model is a MobileNetV2 trained on the **union of three
+public, credential-free Hugging Face datasets** and judged on a **fourth** it
+never trains on. Full pipeline from a fresh checkout (~50 min on Apple-Silicon
+MPS):
 
 ```bash
-# Requires Kaggle API credentials at ~/.kaggle/kaggle.json (chmod 600).
-python -m src.download_data            # downloads grassknoted/asl-alphabet (~1GB)
-make train                             # full custom-CNN training
-# or the transfer variant that reliably hits >=98%:
-python -m src.train --config configs/train_mobilenet.yaml
-make eval                              # writes the real accuracy to metrics.json
+make download-real          # Marxulia (single signer, plain bg) — A–Z
+make download-diverse       # aliciiavs (multi-signer, real backgrounds) — A–Y
+make download-hemg          # Hemg (plain bg, includes J/Z)
+make download-crossval      # EitanG98 — the HELD-OUT eval gate (never trained on)
+make check-overlap-hemg     # perceptual-hash guard: 0% train↔eval contamination
+make train-diverse-hemg     # 3-source union → artifacts/checkpoints_diverse_hemg/
+make eval-realworld-diverse-hemg   # the honest number → realworld_eval_*.json
 ```
 
-On Apple-Silicon MPS, full training takes roughly **30–90 minutes**. After it
-finishes, update the Results table with the value from `artifacts/metrics.json`.
+The honest cross-dataset result lands in `artifacts/realworld_eval_diverse_hemg.json`
+(**55.5% all-26 / 59.8% A–Y headline**). The same-dataset benchmark (96.9%) comes
+from `make eval-real`. Everything is seeded (`seed: 42`) and the splits are
+file-level stratified, so runs are reproducible. The full journey — including the
+levers that were measured and rejected (crop-consistency, augmentation,
+calibration, class-balancing, two architecture swaps) — is documented honestly in
+[`docs/EXPERIMENT_*.md`](docs/).
 
 ## Architecture
 
