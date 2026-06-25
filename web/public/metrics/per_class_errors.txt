@@ -1,12 +1,12 @@
 Top-10 most-confused class pairs (true -> pred: count)
 
-P -> Q: 4
-V -> W: 4
-C -> O: 2
-I -> Y: 2
-K -> C: 2
-N -> E: 2
-N -> M: 2
-N -> T: 2
-R -> X: 2
-R -> Z: 2
+N -> M: 8
+X -> I: 4
+E -> S: 3
+M -> N: 3
+P -> Q: 3
+R -> U: 3
+S -> E: 3
+F -> W: 2
+H -> G: 2
+R -> K: 2
