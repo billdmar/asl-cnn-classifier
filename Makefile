@@ -3,7 +3,7 @@
 
 PY := .venv/bin/python
 
-.PHONY: install download-real download-crossval download-diverse download-hemg sample-train train train-real eval eval-real eval-realworld precrop precrop-clean train-cropped train-cropped-midaug train-cropped-clean eval-realworld-cropped eval-realworld-cropped-midaug eval-realworld-cropped-clean check-overlap train-diverse eval-realworld-diverse train-diverse-midaug eval-realworld-diverse-midaug gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
+.PHONY: install download-real download-crossval download-diverse download-hemg sample-train train train-real eval eval-real eval-realworld precrop precrop-clean train-cropped train-cropped-midaug train-cropped-clean eval-realworld-cropped eval-realworld-cropped-midaug eval-realworld-cropped-clean check-overlap train-diverse eval-realworld-diverse train-diverse-midaug eval-realworld-diverse-midaug check-overlap-hemg train-diverse-hemg eval-realworld-diverse-hemg gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
 
 # Target Hugging Face Space, e.g. `export HF_SPACE=you/asl-cnn-classifier`.
 HF_SPACE ?=
@@ -132,6 +132,15 @@ train-diverse-midaug:
 
 eval-realworld-diverse-midaug:
 	$(PY) -m src.eval_realworld --checkpoint artifacts/checkpoints_diverse_midaug/best_model.pth --data_dir data/asl_crossval --output artifacts/realworld_eval_diverse_midaug.json
+
+# Experiment D3: add Hemg (training-only; vetted 0% overlap vs the eval gate, but
+# 76% internally near-dup so NOT usable as a gate) as a 3rd source for J/Z + data.
+check-overlap-hemg:
+	$(PY) scripts/check_eval_overlap.py --train_dir data/asl_hemg --eval_dir data/asl_crossval
+train-diverse-hemg:
+	$(PY) -m src.train --config configs/train_real_mobilenet_diverse_hemg.yaml
+eval-realworld-diverse-hemg:
+	$(PY) -m src.eval_realworld --checkpoint artifacts/checkpoints_diverse_hemg/best_model.pth --data_dir data/asl_crossval --output artifacts/realworld_eval_diverse_hemg.json
 
 # Grad-CAM explainability overlay for a single image (uses sample data here).
 gradcam:
