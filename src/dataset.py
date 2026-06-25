@@ -177,6 +177,90 @@ class ASLDataset(Dataset):
         return tensor, label, filepath
 
 
+# Default perceptual-hash Hamming distance under which two frames are treated as
+# near-duplicates of one another. Chosen from the real dataset (sequential video
+# frames of the same signer/session): consecutive frames of one recording fall
+# within this radius, while distinct signs/sessions sit well above it. Connected
+# components of the near-duplicate graph become atomic groups that never straddle
+# splits — this is what makes the held-out metric honest.
+DEDUP_PHASH_THRESHOLD = 22
+
+# Each frame is only compared against this many subsequent frames within the same
+# class. The dataset is sequential video, so a recording's near-duplicates are
+# always neighbours — this keeps clustering O(n·window) instead of O(n²) on the
+# ~11k-image real set while still linking every contiguous near-duplicate run.
+DEDUP_WINDOW = 8
+
+
+def _phash_groups(
+    samples: list[tuple[str, int]],
+    threshold: int = DEDUP_PHASH_THRESHOLD,
+    window: int = DEDUP_WINDOW,
+) -> list[int]:
+    """Cluster near-duplicate frames into atomic groups via perceptual hashing.
+
+    Builds a near-duplicate graph: within each class, every frame is linked to a
+    later frame when their perceptual-hash (pHash) Hamming distance is ``<=
+    threshold``. The connected components of that graph are the groups returned
+    here (one integer group id per input sample, aligned to ``samples`` order).
+
+    Because the real dataset is sequential video — each class is a concatenation
+    of recording sessions whose frames are mutual near-duplicates — comparing
+    only the next ``window`` frames inside a class is enough to chain a whole
+    session into a single component without an O(n^2) all-pairs scan.
+
+    Args:
+        samples: ``(filepath, label)`` tuples in a deterministic order.
+        threshold: Max pHash Hamming distance counted as a near-duplicate edge.
+        window: Number of subsequent same-class frames each frame is compared to.
+
+    Returns:
+        A list of group ids, ``group_ids[i]`` for ``samples[i]``. Frames in the
+        same near-duplicate cluster share an id; isolated frames get unique ids.
+    """
+    import imagehash  # local import: only needed on the opt-in dedup path.
+
+    n = len(samples)
+    hashes = [
+        imagehash.phash(Image.open(filepath).convert("RGB"))
+        for filepath, _label in samples
+    ]
+
+    parent = list(range(n))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    # Indices grouped by class, preserving sample order (sequential frames).
+    by_label: dict[int, list[int]] = {}
+    for idx, (_filepath, label) in enumerate(samples):
+        by_label.setdefault(label, []).append(idx)
+
+    for indices in by_label.values():
+        for pos, i in enumerate(indices):
+            for j in indices[pos + 1 : pos + 1 + window]:
+                if hashes[i] - hashes[j] <= threshold:
+                    union(i, j)
+
+    # Re-map roots to small contiguous group ids for readability/reproducibility.
+    root_to_group: dict[int, int] = {}
+    group_ids: list[int] = []
+    for i in range(n):
+        root = find(i)
+        if root not in root_to_group:
+            root_to_group[root] = len(root_to_group)
+        group_ids.append(root_to_group[root])
+    return group_ids
+
+
 def make_stratified_splits(
     root_dir: str | Path,
     train_frac: float = 0.70,
@@ -184,12 +268,31 @@ def make_stratified_splits(
     test_frac: float = 0.15,
     seed: int = 42,
     class_names: list[str] | None = None,
+    dedup: bool = False,
+    dedup_threshold: int = DEDUP_PHASH_THRESHOLD,
 ) -> tuple[list[tuple[str, int]], list[tuple[str, int]], list[tuple[str, int]]]:
     """Split dataset files into train/val/test, stratified by class label.
 
     Splitting happens at the **file** level (not batch level) so no augmented
     view of an image can leak across splits. Returns three lists of
     ``(filepath, label)`` tuples.
+
+    Leakage caveat (why ``dedup`` exists): the file-level random split is
+    *honest only when files are independent*. The real dataset is sequential
+    video — a class folder holds long runs of near-duplicate frames from the
+    same signer/session — so a random split scatters a frame into train and its
+    near-twin into test, inflating the test metric. Set ``dedup=True`` to make
+    near-duplicate frames an atomic group (clustered by perceptual hash) that is
+    assigned to a single split, so no frame and its near-twin ever straddle
+    train/test. This lowers the headline number but makes it trustworthy.
+
+    Args:
+        dedup: When ``True``, cluster near-duplicate frames (perceptual hash) and
+            keep every cluster wholly within one split (group-aware split). When
+            ``False`` (default) the behavior is the original file-level random
+            split — byte-identical to before, so existing repro is unchanged.
+        dedup_threshold: pHash Hamming distance under which two frames are
+            near-duplicates. Only used when ``dedup=True``.
     """
     if abs(train_frac + val_frac + test_frac - 1.0) > 1e-6:
         raise ValueError("train/val/test fractions must sum to 1.0")
@@ -201,6 +304,16 @@ def make_stratified_splits(
 
     files = [s[0] for s in samples]
     labels = [s[1] for s in samples]
+
+    if dedup:
+        return _make_grouped_splits(
+            samples,
+            train_frac=train_frac,
+            val_frac=val_frac,
+            test_frac=test_frac,
+            seed=seed,
+            dedup_threshold=dedup_threshold,
+        )
 
     # First split: train vs (val+test).
     sss1 = StratifiedShuffleSplit(
@@ -219,6 +332,51 @@ def make_stratified_splits(
     train = [(files[i], labels[i]) for i in train_idx]
     val = [(rest_files[i], rest_labels[i]) for i in val_idx]
     test = [(rest_files[i], rest_labels[i]) for i in test_idx]
+    return train, val, test
+
+
+def _make_grouped_splits(
+    samples: list[tuple[str, int]],
+    train_frac: float,
+    val_frac: float,
+    test_frac: float,
+    seed: int,
+    dedup_threshold: int,
+) -> tuple[list[tuple[str, int]], list[tuple[str, int]], list[tuple[str, int]]]:
+    """Group-aware train/val/test split: no near-duplicate cluster straddles splits.
+
+    Near-duplicate frames are clustered with :func:`_phash_groups` and the whole
+    cluster is assigned to one split via :class:`GroupShuffleSplit` (two stages,
+    mirroring the stratified path). Splitting on groups — not files — is what
+    removes the train/test leakage. Stratification by class is best-effort: the
+    grouped split is keyed on clusters, but groups are class-pure here (clusters
+    only link same-class frames), so class balance is preserved at the group
+    level.
+
+    Returns the same ``(filepath, label)`` contract as
+    :func:`make_stratified_splits`.
+    """
+    from sklearn.model_selection import GroupShuffleSplit
+
+    groups = _phash_groups(samples, threshold=dedup_threshold)
+
+    # First split: train-groups vs (val+test)-groups.
+    gss1 = GroupShuffleSplit(
+        n_splits=1, test_size=val_frac + test_frac, random_state=seed
+    )
+    train_idx, rest_idx = next(gss1.split(samples, groups=groups))
+
+    rest_samples = [samples[i] for i in rest_idx]
+    rest_groups = [groups[i] for i in rest_idx]
+
+    # Second split: divide the remainder groups into val vs test.
+    test_share = test_frac / (val_frac + test_frac)
+    gss2 = GroupShuffleSplit(n_splits=1, test_size=test_share, random_state=seed)
+    val_idx, test_idx = next(gss2.split(rest_samples, groups=rest_groups))
+
+    train = [samples[i] for i in train_idx]
+    val = [rest_samples[i] for i in val_idx]
+    test = [rest_samples[i] for i in test_idx]
     return train, val, test
 
 
