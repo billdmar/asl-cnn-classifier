@@ -105,22 +105,30 @@ make install
 
 ## Results
 
-> **Accuracy status — read this.** The headline number below is **real and
-> reproduced**: a MobileNetV2 transfer model was trained on a real ASL hand-sign
-> dataset ([`Marxulia/asl_sign_languages_alphabets_v03`](https://huggingface.co/datasets/Marxulia/asl_sign_languages_alphabets_v03),
-> 26 classes A–Z, ~10.9k images, downloadable with `make download-real` — **no
-> Kaggle account needed**) and scored on its held-out test split. Reproduce with
-> `make download-real && make train-real && make eval-real` (~35 min on
-> Apple-Silicon MPS). The original ≥98% figure on the 29-class Kaggle dataset
-> remains an aspirational target (that dataset also includes *space/del/nothing*);
-> this 26-letter result is what is actually demonstrated here.
+> **Accuracy status — read this.** Two numbers, both real and reproduced, and
+> the distinction matters. **Same-dataset** accuracy (train and test from the
+> same source) is **97.3%** — easy and inflated, because the test images look
+> like the training images. The **honest** number is **cross-dataset accuracy:
+> 47.6%** on a *different* dataset ([`EitanG98/asl_letters`](https://huggingface.co/datasets/EitanG98/asl_letters),
+> different signers and real backgrounds) that the model never trained on —
+> measured with `make eval-realworld-diverse`. This is the number that reflects
+> how the model performs on a stranger's hand. It rose from **33.4% → 47.6%
+> (+14.2 pts)** when training added a second, genuinely diverse dataset
+> ([`aliciiavs/sign_language_image_dataset`](https://huggingface.co/datasets/aliciiavs/sign_language_image_dataset)) —
+> see [`docs/EXPERIMENT_diverse_multisource.md`](docs/EXPERIMENT_diverse_multisource.md)
+> for the full investigation (including the preprocessing levers that were
+> measured and found *not* to help). Reproduce with `make download-real &&
+> make download-diverse && make check-overlap && make train-diverse &&
+> make eval-realworld-diverse` (~45 min on Apple-Silicon MPS).
 
 | Metric | Value | Source |
 | --- | --- | --- |
-| **Test accuracy — MobileNetV2, real ASL dataset (26 classes, held-out test)** | **96.8%** | **measured** (`make eval-real`, 1,631 test images) |
-| Macro F1 — same | **0.968** | measured |
-| Validation accuracy (best epoch) | **97.8%** | measured during `make train-real` |
-| Expected Calibration Error (ECE, 10 bins) | **0.046** | measured (`make calibration`, held-out test split) |
+| **Honest cross-dataset accuracy (different signers/backgrounds)** | **47.6%** | **measured** (`make eval-realworld-diverse`, 712 images, EitanG98 — a dataset never trained on) |
+| Cross-dataset macro F1 — same | **0.468** | measured |
+| Test accuracy — MobileNetV2, merged real datasets (26 classes, held-out test) | **97.3%** | measured (`make eval-real` on the merged train split, 2,898 test images) |
+| Macro F1 — same-dataset held-out | **0.972** | measured |
+| Validation accuracy (best epoch) | **96.1%** | measured during `make train-diverse` |
+| Expected Calibration Error (ECE, 10 bins) | **0.030** | measured (`make calibration`, held-out test split, T=1.0) |
 | Test accuracy — MobileNetV2, full 29-class Kaggle set | ≥98% (target) | aspirational |
 | Custom-CNN parameters | **656,829** | measured (`tests/test_model.py` asserts this) |
 | CPU inference latency (mean) | **5.08 ms/frame** | measured, this machine |
@@ -281,10 +289,16 @@ visualized in `artifacts/confusion_matrix.png`.
 
 ## Real-world caveat
 
-98% is measured on the Kaggle benchmark, whose images are highly uniform
-(consistent signer, lighting, and background). **Real-world accuracy is lower**
-and varies with lighting, skin tone, background clutter, and camera angle. See
-[`MODEL_CARD.md`](MODEL_CARD.md) for limitations and ethical considerations.
+Same-dataset accuracy (97.3%) is measured on held-out images that resemble the
+training set (similar signers, lighting, backgrounds). **Real-world accuracy is
+lower** — the honest cross-dataset number is **47.6%** on different signers and
+real backgrounds, and it still varies with lighting, skin tone, background
+clutter, and camera angle. That gap (and how diverse training data closed part
+of it, while preprocessing tweaks did not) is documented in
+[`docs/EXPERIMENT_diverse_multisource.md`](docs/EXPERIMENT_diverse_multisource.md)
+and [`docs/EXPERIMENT_crop_consistent_retrain.md`](docs/EXPERIMENT_crop_consistent_retrain.md).
+J and Z (motion signs) remain weak — a single static frame cannot capture them.
+See [`MODEL_CARD.md`](MODEL_CARD.md) for limitations and ethical considerations.
 
 ## Project layout
 
