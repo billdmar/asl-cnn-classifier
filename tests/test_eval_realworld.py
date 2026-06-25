@@ -116,6 +116,8 @@ def test_build_metrics_schema_and_values():
         "macro_recall",
         "per_class",
         "most_confused_pairs",
+        "confusion_labels",
+        "confusion_matrix",
         "checkpoint",
         "note",
     }
@@ -126,6 +128,12 @@ def test_build_metrics_schema_and_values():
     assert m["num_no_hand_fallback"] == 3
     assert m["accuracy"] == 4 / 6
     assert set(m["per_class"]) == set(class_names)
+    # Dense confusion matrix is square, aligned to labels, and row-sums = support.
+    assert m["confusion_labels"] == class_names
+    assert len(m["confusion_matrix"]) == len(class_names)
+    for i, name in enumerate(class_names):
+        assert len(m["confusion_matrix"][i]) == len(class_names)
+        assert sum(m["confusion_matrix"][i]) == m["per_class"][name]["support"]
     # Honest provenance note must NOT claim the same-dataset benchmark.
     assert "CROSS-DATASET" in m["note"]
     assert "96.8" in m["note"]
