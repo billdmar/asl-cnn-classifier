@@ -249,6 +249,15 @@ def parse_args() -> argparse.Namespace:
         help="Classify the whole image without hand detection.",
     )
     parser.set_defaults(hand_crop=True)
+    parser.add_argument(
+        "--output",
+        default=str(OUTPUT_PATH),
+        help=(
+            "Where to write the metrics JSON. Defaults to the deployed baseline "
+            "path; pass a distinct file when evaluating a candidate so the "
+            "baseline's realworld_eval.json is not overwritten."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -266,7 +275,8 @@ def main() -> int:
         use_hand_crop=args.hand_crop,
     )
 
-    save_json(OUTPUT_PATH, metrics)
+    output_path = Path(args.output)
+    save_json(output_path, metrics)
 
     print("\n=== Cross-dataset generalization summary ===")
     print(f"Source           : {metrics['source']}")
@@ -281,7 +291,7 @@ def main() -> int:
         print("Top confused pairs (true -> pred: count):")
         for p in metrics["most_confused_pairs"]:
             print(f"  {p['true']} -> {p['pred']}: {p['count']}")
-    print(f"\nSaved metrics to {OUTPUT_PATH}")
+    print(f"\nSaved metrics to {output_path}")
     print(f"\nNOTE: {HONEST_NOTE}")
     return 0
 

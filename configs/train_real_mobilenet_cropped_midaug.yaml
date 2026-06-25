@@ -1,0 +1,43 @@
+# Training configuration — CROP-CONSISTENT + MEDIUM augmentation (Experiment B).
+#
+# Same as configs/train_real_mobilenet_cropped.yaml (trained on the hand-cropped
+# data/asl_real_cropped), but with the `medium` augmentation regime: wider
+# geometric/color jitter + light random erasing, but NO grayscale or blur (those
+# most damage an already-tight hand crop). This isolates the augmentation lever
+# on top of crop-consistency. Judge only on cross-dataset eval.
+#
+# Checkpoints go to a SEPARATE dir to protect both the deployed baseline and the
+# Experiment-A checkpoints.
+
+# Data
+data_dir: data/asl_real_cropped
+image_size: 128
+train_frac: 0.70
+val_frac: 0.15
+test_frac: 0.15
+
+# Model
+arch: mobilenet_v2
+num_classes: 26           # A-Z (this dataset has no del/nothing/space)
+pretrained: true
+
+# Optimization
+batch_size: 64
+num_epochs: 12
+learning_rate: 0.001      # head LR during warm-up
+weight_decay: 0.0001
+optimizer: adamw
+lr_scheduler: cosine
+warmup_epochs: 3          # epochs with frozen backbone before fine-tuning
+
+# Training behavior
+seed: 42
+num_workers: 4
+amp: false                # auto-disabled on non-CUDA devices
+early_stopping_patience: 5
+device: auto
+augmentation: medium
+
+# Output — SEPARATE dir; never clobber the deployed artifacts/checkpoints.
+checkpoint_dir: artifacts/checkpoints_cropped_midaug
+tensorboard_dir: artifacts/runs
