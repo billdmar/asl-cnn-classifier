@@ -178,18 +178,37 @@ class ASLDataset(Dataset):
 
 
 # Default perceptual-hash Hamming distance under which two frames are treated as
-# near-duplicates of one another. Chosen from the real dataset (sequential video
-# frames of the same signer/session): consecutive frames of one recording fall
-# within this radius, while distinct signs/sessions sit well above it. Connected
-# components of the near-duplicate graph become atomic groups that never straddle
-# splits — this is what makes the held-out metric honest.
+# near-duplicates of one another. This is a *heuristic*, not a validated optimum:
+# on the real ~11k-frame set a sweep shows no flat plateau, and >=28 collapses
+# whole classes into one cluster. 22 sits below that cliff and yields plausible
+# session-sized clusters (largest ~50 frames), so it removes obvious leakage
+# without over-merging. Re-tune properly if per-recording/session labels ever
+# become available to ground-truth against. Connected components of the
+# near-duplicate graph become atomic groups that never straddle splits.
 DEDUP_PHASH_THRESHOLD = 22
 
 # Each frame is only compared against this many subsequent frames within the same
-# class. The dataset is sequential video, so a recording's near-duplicates are
-# always neighbours — this keeps clustering O(n·window) instead of O(n²) on the
-# ~11k-image real set while still linking every contiguous near-duplicate run.
+# class (after natural-sorting frames into sequence). The dataset is sequential
+# video, so a recording's near-duplicates are neighbours — this keeps clustering
+# O(n·window) instead of O(n²) on the ~11k-image real set. A wider window links
+# more (largest cluster grows past window 8), so 8 is a compute/coverage tradeoff
+# that catches contiguous runs while staying cheap, not an exhaustive linker.
 DEDUP_WINDOW = 8
+
+
+def _frame_sort_key(filepath: str) -> tuple[int, str]:
+    """Natural-order key so frames sort 0,1,2,…,10 (true video sequence).
+
+    The dataset names frames numerically (``0.png``, ``1.png``, …), but a plain
+    lexical sort orders them ``0,1,10,100,2,…`` — scattering true consecutive
+    frames ~100 positions apart so the windowed scan misses them. Sorting on the
+    leading integer restores sequence; names without a number fall back to a
+    stable lexical tail so the key is always total and deterministic.
+    """
+    import re
+
+    nums = re.findall(r"\d+", Path(filepath).name)
+    return (int(nums[0]) if nums else -1, filepath)
 
 
 def _phash_groups(
@@ -205,9 +224,12 @@ def _phash_groups(
     here (one integer group id per input sample, aligned to ``samples`` order).
 
     Because the real dataset is sequential video — each class is a concatenation
-    of recording sessions whose frames are mutual near-duplicates — comparing
-    only the next ``window`` frames inside a class is enough to chain a whole
-    session into a single component without an O(n^2) all-pairs scan.
+    of recording sessions whose frames are mutual near-duplicates — frames are
+    first natural-sorted into sequence (see :func:`_frame_sort_key`; the caller's
+    lexical order scatters true neighbours), then comparing only the next
+    ``window`` frames inside a class chains a session into one component without
+    an O(n^2) all-pairs scan. Group ids are still aligned to the input
+    ``samples`` order — only the internal comparison order is natural-sorted.
 
     Args:
         samples: ``(filepath, label)`` tuples in a deterministic order.
@@ -239,10 +261,13 @@ def _phash_groups(
         if ra != rb:
             parent[ra] = rb
 
-    # Indices grouped by class, preserving sample order (sequential frames).
+    # Indices grouped by class, natural-sorted into true frame sequence so the
+    # window scan compares actual neighbours (not lexical 0,1,10,100,… order).
     by_label: dict[int, list[int]] = {}
     for idx, (_filepath, label) in enumerate(samples):
         by_label.setdefault(label, []).append(idx)
+    for indices in by_label.values():
+        indices.sort(key=lambda i: _frame_sort_key(samples[i][0]))
 
     for indices in by_label.values():
         for pos, i in enumerate(indices):
