@@ -36,8 +36,15 @@ IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
 
+# Valid training-augmentation regimes, weakest → strongest. See
+# :func:`get_train_transforms` for what each applies.
+AUG_REGIMES = ("standard", "medium", "heavy")
+
+
 def get_train_transforms(
-    image_size: int = IMAGE_SIZE, heavy: bool = False
+    image_size: int = IMAGE_SIZE,
+    heavy: bool = False,
+    regime: str | None = None,
 ) -> transforms.Compose:
     """Augmentation pipeline for training.
 
@@ -45,17 +52,35 @@ def get_train_transforms(
     flip-invariant (e.g. b/d, p/q are mirror images, and several letters differ
     only by orientation). Flipping would create mislabeled training data.
 
+    Three regimes, weakest → strongest:
+
+    * ``standard`` — mild crop/rotation/affine + light color jitter. The default,
+      used for the deployed clean-data fine-tune.
+    * ``medium`` — a middle ground for *crop-consistent* training: wider geometric
+      jitter and stronger color jitter than standard, plus light random erasing,
+      but deliberately **no grayscale or blur** (those most damage an already-tight
+      hand crop, where the discriminative fingers fill the frame).
+    * ``heavy`` — aggressive domain augmentation (grayscale, Gaussian blur,
+      stronger erasing) meant to make the *training* distribution look like a
+      cluttered webcam. Lowers the clean benchmark; judged on cross-dataset only.
+
+    The eval transform stays untouched so the held-out metric is comparable.
+
     Args:
         image_size: Output side length.
-        heavy: When ``True``, use the aggressive domain-augmentation pipeline
-            intended to close the benchmark→real-world gap — wider
-            crop/rotation/affine ranges, stronger lighting/contrast jitter,
-            random Gaussian blur, grayscale (a crude skin-tone invariance), and
-            random erasing (occlusion robustness). These deliberately make the
-            *training* distribution look more like a cluttered webcam; the
-            eval transform stays untouched so the held-out metric is comparable.
+        heavy: Back-compat shorthand for ``regime="heavy"``. Ignored when
+            ``regime`` is given explicitly.
+        regime: One of :data:`AUG_REGIMES`. When ``None``, falls back to
+            ``"heavy"`` if ``heavy`` else ``"standard"``.
     """
-    if heavy:
+    if regime is None:
+        regime = "heavy" if heavy else "standard"
+    if regime not in AUG_REGIMES:
+        raise ValueError(
+            f"unknown augmentation regime {regime!r}; expected one of {AUG_REGIMES}"
+        )
+
+    if regime == "heavy":
         return transforms.Compose(
             [
                 transforms.RandomResizedCrop(
@@ -75,6 +100,24 @@ def get_train_transforms(
                 transforms.ToTensor(),
                 transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
                 transforms.RandomErasing(p=0.25, scale=(0.02, 0.15)),
+            ]
+        )
+    if regime == "medium":
+        return transforms.Compose(
+            [
+                transforms.RandomResizedCrop(
+                    image_size, scale=(0.75, 1.0), ratio=(0.85, 1.18)
+                ),
+                transforms.RandomRotation(20),
+                transforms.RandomAffine(
+                    degrees=0, translate=(0.14, 0.14), scale=(0.85, 1.15), shear=8
+                ),
+                transforms.ColorJitter(
+                    brightness=0.4, contrast=0.4, saturation=0.3, hue=0.06
+                ),
+                transforms.ToTensor(),
+                transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+                transforms.RandomErasing(p=0.15, scale=(0.02, 0.10)),
             ]
         )
     return transforms.Compose(

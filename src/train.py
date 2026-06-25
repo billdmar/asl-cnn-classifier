@@ -248,10 +248,15 @@ def main() -> None:
     )
 
     image_size = int(config["image_size"])
-    heavy_aug = bool(config.get("heavy_augmentation", False))
+    # Augmentation regime: prefer the explicit `augmentation` config key; fall
+    # back to the legacy boolean `heavy_augmentation` so existing configs behave
+    # identically. `get_train_transforms` resolves None → standard/heavy.
+    aug_regime = config.get("augmentation")
+    if aug_regime is None and bool(config.get("heavy_augmentation", False)):
+        aug_regime = "heavy"
     train_ds = ASLDataset(
         samples=train_samples,
-        transform=get_train_transforms(image_size, heavy=heavy_aug),
+        transform=get_train_transforms(image_size, regime=aug_regime),
         class_names=class_names,
     )
     val_ds = ASLDataset(

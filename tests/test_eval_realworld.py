@@ -209,7 +209,7 @@ def test_main_writes_artifact(monkeypatch, tmp_path):
         "most_confused_pairs": [],
     }
     monkeypatch.setattr(erw, "evaluate", lambda **kw: fake_metrics)
-    monkeypatch.setattr(erw, "OUTPUT_PATH", tmp_path / "realworld_eval.json")
+    out_path = tmp_path / "realworld_eval.json"
 
     import argparse
 
@@ -221,10 +221,57 @@ def test_main_writes_artifact(monkeypatch, tmp_path):
             data_dir="data/asl_crossval",
             device="cpu",
             hand_crop=True,
+            output=str(out_path),
         ),
     )
 
     rc = erw.main()
     assert rc == 0
-    written = json.loads((tmp_path / "realworld_eval.json").read_text())
+    written = json.loads(out_path.read_text())
     assert written == fake_metrics
+
+
+def test_main_output_arg_routes_to_distinct_file(monkeypatch, tmp_path):
+    """--output must route metrics to a candidate file, not the baseline path."""
+    fake_metrics = {
+        "source": "cross-dataset:x",
+        "num_samples": 0,
+        "hand_crop_used": True,
+        "num_no_hand_fallback": 0,
+        "accuracy": 0.0,
+        "macro_f1": 0.0,
+        "macro_precision": 0.0,
+        "macro_recall": 0.0,
+        "most_confused_pairs": [],
+    }
+    monkeypatch.setattr(erw, "evaluate", lambda **kw: fake_metrics)
+    # Point the baseline path at a sentinel that must NOT be written.
+    baseline = tmp_path / "realworld_eval.json"
+    candidate = tmp_path / "realworld_eval_cropped.json"
+    monkeypatch.setattr(erw, "OUTPUT_PATH", baseline)
+
+    import argparse
+
+    monkeypatch.setattr(
+        argparse.ArgumentParser,
+        "parse_args",
+        lambda self: argparse.Namespace(
+            checkpoint="c.pth",
+            data_dir="data/asl_crossval",
+            device="cpu",
+            hand_crop=True,
+            output=str(candidate),
+        ),
+    )
+
+    rc = erw.main()
+    assert rc == 0
+    assert candidate.exists()
+    assert not baseline.exists()  # baseline preserved
+
+
+def test_parse_args_output_defaults_to_baseline(monkeypatch):
+    """Without --output, the default is the deployed baseline path."""
+    monkeypatch.setattr(sys, "argv", ["eval_realworld", "--checkpoint", "c.pth"])
+    args = erw.parse_args()
+    assert args.output == str(erw.OUTPUT_PATH)
