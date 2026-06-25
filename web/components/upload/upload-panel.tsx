@@ -66,6 +66,8 @@ export function UploadPanel() {
   const [trueLabel, setTrueLabel] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [showGradcam, setShowGradcam] = useState(false);
+  /** Data URL of the cropped hand region actually classified (transparency). */
+  const [cropPreview, setCropPreview] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   // Track the most recent object URL so we can revoke the previous one.
@@ -97,6 +99,7 @@ export function UploadPanel() {
     setTrueLabel(knownLabel);
     setPreviewUrl(url);
     setShowGradcam(false);
+    setCropPreview(null);
     try {
       const img = await loadImage(url);
 
@@ -105,23 +108,28 @@ export function UploadPanel() {
       // detection failure must never crash the UI — fall back to whole-image.
       let handFound = false;
       let source: CanvasImageSource = img;
+      let cropUrl: string | null = null;
       try {
         const detection = await detectHandInImage(img);
         if (detection.found && detection.box) {
-          source = cropToCanvas(
+          const cropCanvas = cropToCanvas(
             img,
             img.naturalWidth,
             img.naturalHeight,
             detection.box,
             IMAGE_SIZE,
           );
+          source = cropCanvas;
           handFound = true;
+          // Keep the exact region the model saw, for a transparency preview.
+          cropUrl = cropCanvas.toDataURL("image/png");
         }
       } catch {
         // Detection hiccup (e.g. WASM failed to load) — classify whole image.
       }
 
       const result = await classifyImage(source);
+      setCropPreview(cropUrl);
       setOutcome({ result, verdict: interpret(result), handFound });
       setStatus("done");
     } catch (err) {
@@ -135,8 +143,7 @@ export function UploadPanel() {
   /** Accept a user-selected File: validate it's an image, then classify. */
   const handleFile = useCallback(
     (file: File) => {
-      if (!file.type.startsWith("image/")) {
-        // Drop the rejected file; keep any prior preview cleared for clarity.
+      const rejectWith = (message: string) => {
         if (objectUrlRef.current) {
           URL.revokeObjectURL(objectUrlRef.current);
           objectUrlRef.current = null;
@@ -144,7 +151,19 @@ export function UploadPanel() {
         setPreviewUrl(null);
         setOutcome(null);
         setStatus("error");
-        setError(`“${file.name}” isn't an image. Please choose a PNG, JPG, or similar.`);
+        setError(message);
+      };
+      if (!file.type.startsWith("image/")) {
+        rejectWith(`“${file.name}” isn't an image. Please choose a PNG, JPG, or similar.`);
+        return;
+      }
+      // Guard against oversized uploads that would stall a slow connection /
+      // device. The classifier only needs a 128px crop, so this is generous.
+      const MAX_BYTES = 10_000_000;
+      if (file.size > MAX_BYTES) {
+        rejectWith(
+          `“${file.name}” is ${(file.size / 1_000_000).toFixed(1)} MB — please choose an image under 10 MB.`,
+        );
         return;
       }
       // Revoke the previous object URL before minting a new one.
@@ -331,6 +350,21 @@ export function UploadPanel() {
                     No hand detected — classified the whole image; the result may
                     be unreliable. Try a clearer photo of a single hand.
                   </p>
+                )}
+
+                {outcome.handFound && cropPreview && (
+                  <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={cropPreview}
+                      alt="The cropped hand region the model classified"
+                      className="h-14 w-14 rounded-md border border-border-subtle object-cover"
+                    />
+                    <p className="text-xs text-fg-subtle">
+                      Hand detected and cropped — this 128×128 region is what the
+                      model actually classified.
+                    </p>
+                  </div>
                 )}
 
                 {outcome.verdict.unsure && (
