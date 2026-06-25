@@ -39,6 +39,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from PIL import Image
+
 HF_DATASET = "Marxulia/asl_sign_languages_alphabets_v03"
 HF_SPLIT = "train"
 
@@ -56,6 +58,25 @@ DATASETS: dict[str, tuple[str, str]] = {
     # Fallback diversity source: balanced ~70/class, includes J/Z, dark
     # cropped-hand backgrounds (a different regime than Marxulia/aliciiavs).
     "hemg": ("Hemg/sign_language_dataset", "train"),
+}
+
+# Datasets whose class label is NOT in an HF `label` column but is encoded in
+# the image FILENAME (e.g. Roboflow/YOLO exports: ``A11_jpg.rf.<hash>.jpg``).
+# `datasets.load_dataset` drops the filename, so these are pulled with
+# `huggingface_hub.snapshot_download` and the class is parsed from the name via
+# ``regex`` (first capture group → :func:`_normalize_class_name`). Each split is
+# a subdir under the repo root. See :func:`download_from_filenames`.
+FILENAME_DATASETS: dict[str, dict[str, Any]] = {
+    "atalaydenknalbant": {
+        "hf_id": "atalaydenknalbant/asl-dataset",
+        "regex": r"^([A-Za-z])",
+        "split_subdirs": {
+            "train": "train/images",
+            "valid": "valid/images",
+            "test": "test/images",
+        },
+        "default_split": "train",
+    },
 }
 
 
@@ -191,6 +212,92 @@ def download(
     return counts
 
 
+def download_from_filenames(
+    hf_id: str,
+    out_dir: str,
+    split_subdir: str,
+    regex: str,
+    max_per_class: int | None = None,
+) -> dict[str, int]:
+    """Download a filename-labeled HF dataset and write the class-folder layout.
+
+    For datasets where the class is encoded in the image filename (not an HF
+    ``label`` column) — e.g. Roboflow/YOLO exports. Files are fetched with
+    ``huggingface_hub.snapshot_download`` (``load_dataset`` would drop the
+    filename), the leading capture group of ``regex`` is run through
+    :func:`_normalize_class_name`, and each image is written as
+    ``out_dir/<CLASS>/<i>.png`` — the SAME layout the rest of the pipeline
+    consumes, so training/eval need no changes.
+
+    Args:
+        hf_id: HF dataset repo id.
+        out_dir: Destination root (one subfolder per class).
+        split_subdir: Path under the repo root holding this split's images
+            (e.g. ``"train/images"``).
+        regex: Pattern whose first group is the raw class token in the filename.
+        max_per_class: Optional per-class cap.
+
+    Returns:
+        A mapping of ``class name -> number of images written``.
+
+    Raises:
+        RuntimeError: If ``huggingface_hub`` is unavailable or the download fails.
+    """
+    import re
+
+    try:
+        from huggingface_hub import snapshot_download
+    except ImportError as exc:  # pragma: no cover - exercised via monkeypatch
+        raise RuntimeError(
+            "The 'huggingface_hub' package is required for filename-labeled "
+            "datasets. Install it with `pip install huggingface_hub`."
+        ) from exc
+
+    print(f"Snapshotting '{hf_id}' split subdir '{split_subdir}' from the HF Hub...")
+    try:
+        local_root = snapshot_download(
+            repo_id=hf_id,
+            repo_type="dataset",
+            allow_patterns=[f"{split_subdir}/*"],
+        )
+    except Exception as exc:  # noqa: BLE001 - surface any failure clearly
+        raise RuntimeError(f"Failed to snapshot dataset '{hf_id}': {exc}") from exc
+
+    pattern = re.compile(regex)
+    exts = {".jpg", ".jpeg", ".png", ".bmp"}
+    split_dir = Path(local_root) / split_subdir
+    out_root = Path(out_dir)
+    out_root.mkdir(parents=True, exist_ok=True)
+
+    written: Counter[str] = Counter()
+    dropped = 0
+    for img_path in sorted(split_dir.iterdir()):
+        if img_path.suffix.lower() not in exts:
+            continue
+        match = pattern.match(img_path.name)
+        name = _normalize_class_name(match.group(1)) if match else None
+        if name is None:
+            dropped += 1
+            continue
+        if max_per_class is not None and written[name] >= max_per_class:
+            continue
+        class_dir = out_root / name
+        class_dir.mkdir(parents=True, exist_ok=True)
+        image = Image.open(img_path).convert("RGB")
+        image.save(class_dir / f"{written[name]}.png", format="PNG")
+        written[name] += 1
+
+    counts = {name: written[name] for name in sorted(written)}
+    total = sum(counts.values())
+    print(f"\nWrote {total} images to {out_root}/")
+    if dropped:
+        print(f"Dropped {dropped} images with no parseable A–Z class.")
+    print("Per-class counts:")
+    for name in sorted(counts):
+        print(f"  {name}: {counts[name]}")
+    return counts
+
+
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
@@ -212,8 +319,8 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Friendly name (one of: "
-            f"{', '.join(sorted(DATASETS))}) or a raw HF dataset id. "
-            "Defaults to the Marxulia training set."
+            f"{', '.join(sorted({*DATASETS, *FILENAME_DATASETS}))}) or a raw HF "
+            "dataset id. Defaults to the Marxulia training set."
         ),
     )
     parser.add_argument(
@@ -227,6 +334,24 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     """CLI entry point."""
     args = parse_args()
+    # Route filename-labeled datasets (class in the filename, no `label` column)
+    # to the snapshot-based loader; everything else uses the standard path.
+    if args.dataset in FILENAME_DATASETS:
+        spec = FILENAME_DATASETS[args.dataset]
+        split = args.split or spec["default_split"]
+        if split not in spec["split_subdirs"]:
+            raise ValueError(
+                f"Unknown split '{split}' for '{args.dataset}'. "
+                f"Expected one of {sorted(spec['split_subdirs'])}."
+            )
+        download_from_filenames(
+            hf_id=spec["hf_id"],
+            out_dir=args.out_dir,
+            split_subdir=spec["split_subdirs"][split],
+            regex=spec["regex"],
+            max_per_class=args.max_per_class,
+        )
+        return 0
     download(
         out_dir=args.out_dir,
         max_per_class=args.max_per_class,
