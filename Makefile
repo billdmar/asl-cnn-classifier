@@ -3,7 +3,7 @@
 
 PY := .venv/bin/python
 
-.PHONY: install download-real download-crossval sample-train train train-real eval eval-real eval-realworld precrop train-cropped train-cropped-midaug eval-realworld-cropped eval-realworld-cropped-midaug gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
+.PHONY: install download-real download-crossval sample-train train train-real eval eval-real eval-realworld precrop precrop-clean train-cropped train-cropped-midaug train-cropped-clean eval-realworld-cropped eval-realworld-cropped-midaug eval-realworld-cropped-clean gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
 
 # Target Hugging Face Space, e.g. `export HF_SPACE=you/asl-cnn-classifier`.
 HF_SPACE ?=
@@ -68,6 +68,12 @@ eval-realworld:
 precrop:
 	$(PY) scripts/precrop_dataset.py --in_dir data/asl_real --out_dir data/asl_real_cropped
 
+# Same as precrop, but DROP the ~15% non-photographic sketch line drawings that
+# pollute crop-consistent training (they all fail hand detection). Writes
+# data/asl_real_cropped_clean/.
+precrop-clean:
+	$(PY) scripts/precrop_dataset.py --in_dir data/asl_real --out_dir data/asl_real_cropped_clean --drop-sketches
+
 # Experiment A: crop-consistent fine-tune, standard aug → SEPARATE checkpoint
 # (artifacts/checkpoints_cropped/). Does NOT clobber the deployed baseline.
 train-cropped:
@@ -77,6 +83,10 @@ train-cropped:
 train-cropped-midaug:
 	$(PY) -m src.train --config configs/train_real_mobilenet_cropped_midaug.yaml
 
+# Experiment A-clean: crop-consistent fine-tune on the sketch-filtered clean set.
+train-cropped-clean:
+	$(PY) -m src.train --config configs/train_real_mobilenet_cropped_clean.yaml
+
 # Gate Experiment A on the cross-dataset set; writes a DISTINCT artifact so the
 # deployed baseline's realworld_eval.json is preserved for comparison.
 eval-realworld-cropped:
@@ -85,6 +95,10 @@ eval-realworld-cropped:
 # Gate Experiment B on the cross-dataset set (distinct artifact).
 eval-realworld-cropped-midaug:
 	$(PY) -m src.eval_realworld --checkpoint artifacts/checkpoints_cropped_midaug/best_model.pth --data_dir data/asl_crossval --output artifacts/realworld_eval_cropped_midaug.json
+
+# Gate Experiment A-clean on the cross-dataset set (distinct artifact).
+eval-realworld-cropped-clean:
+	$(PY) -m src.eval_realworld --checkpoint artifacts/checkpoints_cropped_clean/best_model.pth --data_dir data/asl_crossval --output artifacts/realworld_eval_cropped_clean.json
 
 # Grad-CAM explainability overlay for a single image (uses sample data here).
 gradcam:

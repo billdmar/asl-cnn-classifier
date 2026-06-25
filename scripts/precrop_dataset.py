@@ -34,6 +34,7 @@ import json
 import sys
 from pathlib import Path
 
+import numpy as np
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -51,6 +52,31 @@ from src.handcrop import (  # noqa: E402
 # crop-consistent training set rather than improve it.
 NO_HAND_WARN_RATE = 0.20
 
+# The Marxulia training set bundles ~63 pencil-sketch line drawings per class
+# (15% of the data) that are not photographs — grayscale diagrams with near-zero
+# color saturation. They look nothing like the served (photographic) distribution
+# and 100% fail hand detection, so they pollute crop-consistent training. A pixel
+# is "colorless" when its RGB max-min spread is below SKETCH_SAT_THRESHOLD; an
+# image is a line drawing when at least SKETCH_PIXEL_FRACTION of pixels are.
+SKETCH_SAT_THRESHOLD = 12
+SKETCH_PIXEL_FRACTION = 0.97
+
+
+def is_line_drawing(
+    image: Image.Image,
+    sat_threshold: int = SKETCH_SAT_THRESHOLD,
+    pixel_fraction: float = SKETCH_PIXEL_FRACTION,
+) -> bool:
+    """True if ``image`` is a near-grayscale line drawing (not a color photo).
+
+    Pure and dependency-light so it is unit-testable. Measures per-pixel color
+    saturation as ``max(R,G,B) - min(R,G,B)``; a sketch/B&W diagram has almost
+    every pixel near-colorless, while a skin-tone photo does not.
+    """
+    arr = np.asarray(image.convert("RGB"), dtype=np.int16)
+    saturation = arr.max(axis=2) - arr.min(axis=2)
+    return bool((saturation < sat_threshold).mean() > pixel_fraction)
+
 
 def precrop_dataset(
     in_dir: str | Path,
@@ -58,11 +84,17 @@ def precrop_dataset(
     margin: float = CROP_MARGIN,
     model_path: str | Path = DEFAULT_MODEL_PATH,
     drop_no_hand: bool = False,
+    drop_sketches: bool = False,
 ) -> dict:
     """Crop every image in ``in_dir`` to its hand region; write to ``out_dir``.
 
     Returns a report dict (also written to ``out_dir/_precrop_report.json``) with
-    per-class totals and no-hand counts plus the global no-hand rate.
+    per-class totals, no-hand counts, sketch counts, and the global rates.
+
+    Args:
+        drop_sketches: When ``True``, skip non-photographic line drawings
+            (see :func:`is_line_drawing`) — they pollute crop-consistent
+            training and all fail hand detection.
     """
     in_root = Path(in_dir)
     out_root = Path(out_dir)
@@ -74,6 +106,7 @@ def precrop_dataset(
     per_class: dict[str, dict[str, int]] = {}
     total = 0
     total_no_hand = 0
+    total_sketch = 0
     total_written = 0
     try:
         for name in class_names:
@@ -85,12 +118,17 @@ def precrop_dataset(
 
             n_total = 0
             n_no_hand = 0
+            n_sketch = 0
             n_written = 0
             for img_path in sorted(class_in.iterdir()):
                 if img_path.suffix.lower() not in exts:
                     continue
                 n_total += 1
                 image = Image.open(img_path).convert("RGB")
+                if is_line_drawing(image):
+                    n_sketch += 1
+                    if drop_sketches:
+                        continue
                 cropped = detect_and_crop(image, landmarker=landmarker, margin=margin)
                 if cropped is None:
                     n_no_hand += 1
@@ -104,17 +142,19 @@ def precrop_dataset(
             per_class[name] = {
                 "total": n_total,
                 "no_hand": n_no_hand,
+                "sketches": n_sketch,
                 "written": n_written,
             }
             total += n_total
             total_no_hand += n_no_hand
+            total_sketch += n_sketch
             total_written += n_written
 
             rate = (n_no_hand / n_total) if n_total else 0.0
             flag = "  <-- HIGH no-hand rate" if rate > NO_HAND_WARN_RATE else ""
             print(
                 f"  {name}: {n_total} imgs, {n_no_hand} no-hand "
-                f"({rate:.1%}), {n_written} written{flag}"
+                f"({rate:.1%}), {n_sketch} sketches, {n_written} written{flag}"
             )
     finally:
         landmarker.close()
@@ -124,11 +164,14 @@ def precrop_dataset(
         "out_dir": str(out_root),
         "margin": margin,
         "drop_no_hand": drop_no_hand,
+        "drop_sketches": drop_sketches,
         "num_classes": len(per_class),
         "total_images": total,
         "total_no_hand": total_no_hand,
+        "total_sketches": total_sketch,
         "total_written": total_written,
         "global_no_hand_rate": (total_no_hand / total) if total else 0.0,
+        "global_sketch_rate": (total_sketch / total) if total else 0.0,
         "per_class": per_class,
     }
     out_root.mkdir(parents=True, exist_ok=True)
@@ -159,6 +202,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip images with no detectable hand (default: copy whole image).",
     )
+    parser.add_argument(
+        "--drop-sketches",
+        dest="drop_sketches",
+        action="store_true",
+        help="Skip non-photographic line drawings (the ~15%% sketch contamination).",
+    )
     return parser.parse_args()
 
 
@@ -171,12 +220,16 @@ def main() -> int:
         margin=args.margin,
         model_path=args.model_path,
         drop_no_hand=args.drop_no_hand,
+        drop_sketches=args.drop_sketches,
     )
     print("\n=== Pre-crop summary ===")
     print(f"Classes        : {report['num_classes']}")
     print(f"Total images   : {report['total_images']}")
     print(f"No-hand images : {report['total_no_hand']} "
           f"({report['global_no_hand_rate']:.1%})")
+    print(f"Sketches       : {report['total_sketches']} "
+          f"({report['global_sketch_rate']:.1%})"
+          f"{' (dropped)' if report['drop_sketches'] else ''}")
     print(f"Written        : {report['total_written']}")
     print(f"Report         : {Path(report['out_dir']) / '_precrop_report.json'}")
     return 0
