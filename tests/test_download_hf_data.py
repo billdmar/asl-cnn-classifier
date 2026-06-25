@@ -230,3 +230,64 @@ def test_eval_labels_derive_from_class_names(monkeypatch, tmp_path, capsys):
     metrics = json.loads(Path("artifacts/metrics.json").read_text())
     assert set(metrics["per_class"]) == set(class_names)
     assert len(metrics["per_class"]) == 3
+
+
+# --- Filename-labeled ingestion (snapshot_download path) --------------------
+
+
+def _install_fake_snapshot(monkeypatch, snapshot_root: Path) -> None:
+    """Inject a fake huggingface_hub whose snapshot_download returns a local dir."""
+    module = types.ModuleType("huggingface_hub")
+    module.snapshot_download = lambda *a, **k: str(snapshot_root)  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "huggingface_hub", module)
+
+
+def test_download_from_filenames_parses_class_from_name(monkeypatch, tmp_path):
+    """Class is the leading filename letter; layout + counts must be correct."""
+    # Build a fake snapshot: <root>/train/images/<LETTER>..._jpg.rf.<hash>.jpg
+    images_dir = tmp_path / "snap" / "train" / "images"
+    images_dir.mkdir(parents=True)
+    specs = {"A": 3, "B": 2, "C": 1}
+    for letter, n in specs.items():
+        for i in range(n):
+            _make_image((10, 20, 30)).save(
+                images_dir / f"{letter}1{i}_jpg.rf.deadbeef{i}.jpg"
+            )
+    # A non-letter-prefixed file must be dropped.
+    _make_image((0, 0, 0)).save(images_dir / "9x_jpg.rf.nope.jpg")
+
+    _install_fake_snapshot(monkeypatch, tmp_path / "snap")
+    out = tmp_path / "out"
+    counts = dl.download_from_filenames(
+        hf_id="atalaydenknalbant/asl-dataset",
+        out_dir=str(out),
+        split_subdir="train/images",
+        regex=r"^([A-Za-z])",
+        max_per_class=None,
+    )
+    assert counts == {"A": 3, "B": 2, "C": 1}
+    assert sorted(p.name for p in (out / "A").iterdir()) == ["0.png", "1.png", "2.png"]
+    assert not (out / "9").exists()  # non-letter dropped
+
+
+def test_download_from_filenames_respects_max_per_class(monkeypatch, tmp_path):
+    images_dir = tmp_path / "snap" / "valid" / "images"
+    images_dir.mkdir(parents=True)
+    for i in range(5):
+        _make_image((1, 2, 3)).save(images_dir / f"A1{i}_jpg.rf.h{i}.jpg")
+
+    _install_fake_snapshot(monkeypatch, tmp_path / "snap")
+    counts = dl.download_from_filenames(
+        hf_id="x/y",
+        out_dir=str(tmp_path / "out"),
+        split_subdir="valid/images",
+        regex=r"^([A-Za-z])",
+        max_per_class=2,
+    )
+    assert counts == {"A": 2}
+
+
+def test_filename_dataset_registry_has_atalay():
+    spec = dl.FILENAME_DATASETS["atalaydenknalbant"]
+    assert spec["hf_id"] == "atalaydenknalbant/asl-dataset"
+    assert set(spec["split_subdirs"]) == {"train", "valid", "test"}
