@@ -25,7 +25,7 @@ export const UNSURE_THRESHOLD = 0.6;
 
 /** How a prediction should be presented to the user. */
 export interface ConfidenceVerdict {
-  /** True when top-1 confidence is below {@link UNSURE_THRESHOLD}. */
+  /** True when top-1 confidence is below its threshold (per-class or global). */
   unsure: boolean;
   /** The top prediction regardless of confidence. */
   top: Prediction;
@@ -33,21 +33,47 @@ export interface ConfidenceVerdict {
   hint: string;
 }
 
+/**
+ * Optional per-class acceptance thresholds (from `fit_thresholds.py`, shipped in
+ * `calibration.json`). When the top class has an entry, that threshold overrides
+ * the global one — used to curb over-predicted "sink" classes (e.g. S, Q) by
+ * demanding higher confidence before we present them.
+ */
+export type ClassThresholds = Record<string, number>;
+
 const UNSURE_HINT =
   "Unsure — try a plainer background, better lighting, and center your hand in the box.";
 
 /**
  * Decide whether a result should render as confident or "unsure".
  *
+ * The effective threshold for the top class is, in priority order: its entry in
+ * `classThresholds` (if present), else `threshold` (the global operating point).
+ * An optional `margin` additionally requires the top1−top2 probability gap to
+ * clear it — a small margin means two classes are nearly tied (the T-vs-S call),
+ * which we surface as "unsure" rather than guessing.
+ *
  * @param result - An inference result from the classifier.
- * @param threshold - Override for {@link UNSURE_THRESHOLD}.
+ * @param threshold - Global override for {@link UNSURE_THRESHOLD}.
+ * @param classThresholds - Optional per-class acceptance thresholds.
+ * @param margin - Optional minimum top1−top2 gap.
  * @returns The presentation verdict.
  */
 export function interpret(
   result: InferenceResult,
   threshold: number = UNSURE_THRESHOLD,
+  classThresholds?: ClassThresholds,
+  margin?: number,
 ): ConfidenceVerdict {
-  const unsure = result.top.prob < threshold;
+  const perClass = classThresholds?.[result.top.label];
+  const effective = perClass ?? threshold;
+  let unsure = result.top.prob < effective;
+
+  if (!unsure && margin !== undefined && result.ranked.length > 1) {
+    const gap = result.top.prob - result.ranked[1]!.prob;
+    if (gap < margin) unsure = true;
+  }
+
   return {
     unsure,
     top: result.top,

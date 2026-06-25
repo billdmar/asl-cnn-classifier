@@ -206,6 +206,9 @@ def test_main_writes_artifact(monkeypatch, tmp_path):
         "macro_f1": 0.0,
         "macro_precision": 0.0,
         "macro_recall": 0.0,
+        "accuracy_ay": 0.0,
+        "macro_f1_ay": 0.0,
+        "num_samples_ay": 0,
         "most_confused_pairs": [],
     }
     monkeypatch.setattr(erw, "evaluate", lambda **kw: fake_metrics)
@@ -222,6 +225,9 @@ def test_main_writes_artifact(monkeypatch, tmp_path):
             device="cpu",
             hand_crop=True,
             output=str(out_path),
+            thresholds_json=None,
+            margin=None,
+            tta=False,
         ),
     )
 
@@ -242,6 +248,9 @@ def test_main_output_arg_routes_to_distinct_file(monkeypatch, tmp_path):
         "macro_f1": 0.0,
         "macro_precision": 0.0,
         "macro_recall": 0.0,
+        "accuracy_ay": 0.0,
+        "macro_f1_ay": 0.0,
+        "num_samples_ay": 0,
         "most_confused_pairs": [],
     }
     monkeypatch.setattr(erw, "evaluate", lambda **kw: fake_metrics)
@@ -261,6 +270,9 @@ def test_main_output_arg_routes_to_distinct_file(monkeypatch, tmp_path):
             device="cpu",
             hand_crop=True,
             output=str(candidate),
+            thresholds_json=None,
+            margin=None,
+            tta=False,
         ),
     )
 
@@ -275,3 +287,82 @@ def test_parse_args_output_defaults_to_baseline(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["eval_realworld", "--checkpoint", "c.pth"])
     args = erw.parse_args()
     assert args.output == str(erw.OUTPUT_PATH)
+
+
+# --------------------------------------------------------------------------- #
+# Decision policy (per-class thresholds + margin) and A-Y subset metric
+# --------------------------------------------------------------------------- #
+
+
+def test_decision_policy_default_is_argmax():
+    """No thresholds + no margin == plain argmax (byte-identical base path)."""
+    probs = np.array([0.1, 0.7, 0.2])
+    assert erw.apply_decision_policy(probs) == 1
+
+
+def test_decision_policy_threshold_redirects_off_sink_class():
+    """A sink class below its threshold falls through to the next that clears."""
+    names = ["S", "T", "U"]
+    probs = np.array([0.55, 0.40, 0.05])  # argmax = S
+    # S needs 0.6 to be accepted; it's at 0.55 → fall through to T (no floor).
+    pred = erw.apply_decision_policy(
+        probs, class_thresholds={"S": 0.6}, class_names=names
+    )
+    assert names[pred] == "T"
+
+
+def test_decision_policy_threshold_kept_when_cleared():
+    names = ["S", "T", "U"]
+    probs = np.array([0.75, 0.20, 0.05])  # S clears its 0.6 floor
+    pred = erw.apply_decision_policy(
+        probs, class_thresholds={"S": 0.6}, class_names=names
+    )
+    assert names[pred] == "S"
+
+
+def test_decision_policy_margin_only_does_not_reorder():
+    """Margin gates acceptance but apply_decision_policy still returns a class."""
+    probs = np.array([0.52, 0.48])
+    # Small margin: argmax still returned (policy never invents abstention here;
+    # the web layer maps low-margin to 'unsure'). Index 0 remains the pick.
+    assert erw.apply_decision_policy(probs, margin=0.1) == 0
+
+
+def test_subset_metrics_excludes_motion_letters():
+    names = ["A", "J", "Z", "B"]
+    # 4 samples, all correct except the J sample. Excluding J/Z should drop them.
+    y_true = np.array([0, 1, 2, 3])
+    y_pred = np.array([0, 0, 0, 3])  # A ok, J wrong, Z wrong, B ok
+    full = erw._subset_metrics(y_true, y_pred, names, exclude=())
+    ay = erw._subset_metrics(y_true, y_pred, names, exclude=("J", "Z"))
+    assert full["num_samples"] == 4
+    assert ay["num_samples"] == 2  # only A, B remain
+    assert ay["accuracy"] == 1.0  # both remaining are correct
+
+
+def test_build_metrics_includes_ay_fields():
+    names = [chr(c) for c in range(ord("A"), ord("Z") + 1)]
+    y_true = np.arange(26)
+    y_pred = np.arange(26)
+    m = erw._build_metrics(
+        y_true, y_pred, names, checkpoint="c", data_dir="d",
+        use_hand_crop=True, num_no_hand=0,
+    )
+    assert "accuracy_ay" in m and "macro_f1_ay" in m and "num_samples_ay" in m
+    assert m["num_samples_ay"] == 24  # J and Z excluded
+    assert m["accuracy_ay"] == 1.0
+
+
+def test_tta_views_are_scale_only_no_flip():
+    """TTA must produce centre crops only — never a horizontal mirror."""
+    img = Image.fromarray(
+        np.tile(np.arange(64, dtype=np.uint8)[None, :, None], (64, 1, 3))
+    )  # horizontal gradient: a flip would be detectable
+    views = erw._tta_views(img)
+    assert len(views) >= 2
+    base = np.asarray(views[0])
+    # No view may equal the horizontal mirror of the original.
+    mirror = base[:, ::-1, :]
+    for v in views:
+        arr = np.asarray(v.resize(base.shape[1::-1]))
+        assert not np.array_equal(arr, mirror)
