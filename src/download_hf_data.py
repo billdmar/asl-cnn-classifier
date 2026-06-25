@@ -49,6 +49,13 @@ HF_SPLIT = "train"
 DATASETS: dict[str, tuple[str, str]] = {
     "marxulia": (HF_DATASET, HF_SPLIT),
     "asl_letters": ("EitanG98/asl_letters", "train"),
+    # A genuinely diverse TRAINING source (multiple signers, skin tones, real
+    # varied backgrounds/lighting) — the antidote to Marxulia's single-signer,
+    # plain-background overfit. 8,442 imgs, A–Y (no J/Z, both motion signs).
+    "diverse": ("aliciiavs/sign_language_image_dataset", "train"),
+    # Fallback diversity source: balanced ~70/class, includes J/Z, dark
+    # cropped-hand backgrounds (a different regime than Marxulia/aliciiavs).
+    "hemg": ("Hemg/sign_language_dataset", "train"),
 }
 
 
