@@ -15,6 +15,7 @@ import {
   toReliabilityRows,
   type CalibrationData,
   type Metrics,
+  type RealworldEval,
   type TrainingHistory,
 } from "../metrics";
 
@@ -31,6 +32,10 @@ const history = JSON.parse(
 const calibration = JSON.parse(
   readFileSync(path.join(METRICS_DIR, "calibration.json"), "utf-8"),
 ) as CalibrationData;
+
+const realworld = JSON.parse(
+  readFileSync(path.join(METRICS_DIR, "realworld_eval.json"), "utf-8"),
+) as RealworldEval;
 
 describe("toClassRows", () => {
   it("produces one row per class (26 letters)", () => {
@@ -112,5 +117,27 @@ describe("bestValEpoch", () => {
 
   it("returns undefined for empty history", () => {
     expect(bestValEpoch([])).toBeUndefined();
+  });
+});
+
+describe("realworld_eval (honest cross-dataset number)", () => {
+  it("exposes the A-Y headline and full 26-class fields", () => {
+    expect(typeof realworld.accuracy).toBe("number");
+    expect(typeof realworld.accuracy_ay).toBe("number");
+    expect(typeof realworld.macro_f1_ay).toBe("number");
+    expect(realworld.num_samples).toBeGreaterThan(0);
+  });
+
+  it("is far below the same-dataset benchmark (the whole point)", () => {
+    // The honest cross-dataset number must be much lower than same-dataset.
+    expect(realworld.accuracy).toBeLessThan(metrics.overall_accuracy - 0.2);
+  });
+
+  it("A-Y headline excludes the weak J/Z so it is >= the 26-class number", () => {
+    expect(realworld.accuracy_ay).toBeGreaterThanOrEqual(realworld.accuracy);
+  });
+
+  it("carries an honest cross-dataset note", () => {
+    expect(realworld.note.toLowerCase()).toContain("cross-dataset");
   });
 });

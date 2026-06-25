@@ -61,25 +61,36 @@ export function AccuracyStory() {
       <Card className="border-accent/30">
         <CardHeader>
           <div className="flex flex-wrap items-center gap-3">
-            <CardTitle>Real-world webcam accuracy</CardTitle>
-            <Badge>Measurement in progress</Badge>
+            <CardTitle>The honest cross-dataset number</CardTitle>
+            <Badge variant="accent">Measured</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <p>
-            Real-world accuracy is <strong className="text-fg">lower</strong> than the
-            benchmark, and it varies with lighting, skin tone, background clutter, and
-            camera angle. We deliberately do not show a single headline real-world number
-            yet, because we do not have a trustworthy measured one — a robustness
-            workstream is producing it. When it lands, it will appear here as a measured
-            value, not an estimate.
+            The benchmark above is inflated: train and test images come from the same
+            uniform dataset, so the test set looks like the training set. The number
+            that actually matters is{" "}
+            <strong className="text-fg">cross-dataset</strong> accuracy — evaluated on a{" "}
+            <em>different</em> dataset (<code className="rounded bg-bg-subtle px-1 py-0.5 text-sm">EitanG98/asl_letters</code>,
+            different signers and real backgrounds) the model never trained on. It is{" "}
+            <strong className="text-fg">59.8% on the 24-letter A–Y headline</strong>{" "}
+            (J and Z are dynamic motion signs a single frame can&apos;t capture), or{" "}
+            <strong className="text-fg">55.5% across all 26 classes</strong>. Reproduce
+            with{" "}
+            <code className="rounded bg-bg-subtle px-1 py-0.5 text-sm">
+              make eval-realworld-diverse-hemg
+            </code>
+            .
           </p>
           <p>
-            The benchmark dataset is also relatively homogeneous, so a random train/test
-            split risks placing near-duplicate frames on both sides — a leakage-style
-            optimism. A group-aware split (by signer or session) would likely lower the
-            headline number. We report the benchmark with this caveat rather than
-            presenting it as real-world capability.
+            That number was <strong className="text-fg">earned by data diversity</strong>,
+            the only lever that moved it: single-source{" "}
+            <strong className="text-fg">33.4%</strong> → add a multi-signer dataset{" "}
+            <strong className="text-fg">47.6%</strong> → add a third source{" "}
+            <strong className="text-fg">55.5%</strong>. Preprocessing tricks, augmentation,
+            calibration, and architecture swaps were all measured and found <em>not</em> to
+            help — documented as honest negatives in the repo&apos;s{" "}
+            <code className="rounded bg-bg-subtle px-1 py-0.5 text-sm">docs/</code>.
           </p>
         </CardContent>
       </Card>
@@ -105,13 +116,11 @@ export function AccuracyStory() {
             Measured on the <strong className="text-fg">same</strong> held-out test split,
             the robust model scored <strong className="text-fg">92.3%</strong> versus the
             baseline&apos;s 96.8% — heavy augmentation cost ~4.5 points on the benchmark.
-            Its goal was real-world robustness, but{" "}
-            <strong className="text-fg">
-              without a labelled real-world test set we cannot claim it actually helped
-              there
-            </strong>
-            , so the deployed model remains the baseline. We&apos;d rather ship the
-            honestly-better-measured model than the one we hoped was better.
+            Once we had a real cross-dataset test set, augmentation proved neutral there
+            too: it was <strong className="text-fg">data diversity</strong>, not
+            augmentation or architecture, that moved the honest number. The deployed model
+            is now the diverse multi-source one — chosen because it measured better on the
+            cross-dataset gate, not because we hoped it was better.
           </p>
         </CardContent>
       </Card>

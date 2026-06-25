@@ -7,11 +7,13 @@ import {
   bestValEpoch,
   fetchCalibration,
   fetchMetrics,
+  fetchRealworldEval,
   fetchTrainingHistory,
   topConfusedPairs,
   toClassRows,
   type CalibrationData,
   type Metrics,
+  type RealworldEval,
   type TrainingHistory,
 } from "@/lib/metrics";
 
@@ -31,6 +33,8 @@ type LoadState =
       metrics: Metrics;
       history: TrainingHistory;
       calibration: CalibrationData;
+      realworld: RealworldEval;
+      gate2: RealworldEval | null;
     };
 
 /** Visually-hidden text for screen readers (mirrors Tailwind's sr-only). */
@@ -57,9 +61,24 @@ export function MetricsDashboard() {
   useEffect(() => {
     setMounted(true);
     let cancelled = false;
-    Promise.all([fetchMetrics(), fetchTrainingHistory(), fetchCalibration()])
-      .then(([metrics, history, calibration]) => {
-        if (!cancelled) setState({ status: "ready", metrics, history, calibration });
+    Promise.all([
+      fetchMetrics(),
+      fetchTrainingHistory(),
+      fetchCalibration(),
+      fetchRealworldEval(),
+      // The 2nd gate is optional — tolerate it being absent.
+      fetchRealworldEval("realworld_eval_gate2").catch(() => null),
+    ])
+      .then(([metrics, history, calibration, realworld, gate2]) => {
+        if (!cancelled)
+          setState({
+            status: "ready",
+            metrics,
+            history,
+            calibration,
+            realworld,
+            gate2,
+          });
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -95,7 +114,7 @@ export function MetricsDashboard() {
     );
   }
 
-  const { metrics, history, calibration } = state;
+  const { metrics, history, calibration, realworld, gate2 } = state;
   const best = bestValEpoch(history);
   const classRows = toClassRows(metrics.per_class);
   const pairs = topConfusedPairs(metrics.most_confused_pairs, 10);
@@ -130,6 +149,64 @@ export function MetricsDashboard() {
 
   return (
     <div className="flex flex-col gap-8">
+      <Card>
+        <CardHeader>
+          <CardTitle>Cross-dataset generalization — the honest number</CardTitle>
+          <p className="text-sm text-fg-muted">
+            Measured on a <strong>different</strong> dataset the model never trained
+            on (different signers, real backgrounds). This is how it performs on a
+            stranger&apos;s hand — far below the {pct(metrics.overall_accuracy)}{" "}
+            same-dataset benchmark, and the only number that reflects real-world use.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div>
+              <dt className="text-xs text-fg-subtle">Accuracy (A–Y headline)</dt>
+              <dd className="text-2xl font-bold tabular-nums text-fg">
+                {pct(realworld.accuracy_ay)}
+              </dd>
+              <dd className="text-xs text-fg-subtle">
+                24 static letters (J, Z are dynamic motion signs)
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-fg-subtle">Accuracy (all 26)</dt>
+              <dd className="text-2xl font-bold tabular-nums text-fg">
+                {pct(realworld.accuracy)}
+              </dd>
+              <dd className="text-xs text-fg-subtle">
+                macro-F1 {realworld.macro_f1.toFixed(3)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-fg-subtle">Eval images</dt>
+              <dd className="text-2xl font-bold tabular-nums text-fg">
+                {realworld.num_samples.toLocaleString()}
+              </dd>
+              <dd className="text-xs text-fg-subtle">held-out, never trained on</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-fg-subtle">Trajectory</dt>
+              <dd className="text-2xl font-bold tabular-nums text-fg">
+                33 → 47 → 55
+              </dd>
+              <dd className="text-xs text-fg-subtle">
+                each step added a diverse dataset
+              </dd>
+            </div>
+          </dl>
+          {gate2 ? (
+            <p className="mt-4 text-xs text-fg-subtle">
+              Second (directional) gate: {pct(gate2.accuracy_ay)} A–Y on{" "}
+              {gate2.num_samples.toLocaleString()} images — small and imbalanced, a
+              sanity check rather than a precise measure.
+            </p>
+          ) : null}
+          <p className="mt-3 text-xs text-fg-subtle">{realworld.note}</p>
+        </CardContent>
+      </Card>
+
       <StatCards stats={stats} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
