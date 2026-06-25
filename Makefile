@@ -3,7 +3,7 @@
 
 PY := .venv/bin/python
 
-.PHONY: install download-real download-crossval download-diverse download-hemg sample-train train train-real eval eval-real eval-realworld precrop precrop-clean train-cropped train-cropped-midaug train-cropped-clean eval-realworld-cropped eval-realworld-cropped-midaug eval-realworld-cropped-clean check-overlap train-diverse eval-realworld-diverse train-diverse-midaug eval-realworld-diverse-midaug check-overlap-hemg train-diverse-hemg eval-realworld-diverse-hemg train-diverse-hemg-balanced eval-realworld-diverse-hemg-balanced train-diverse-hemg-mnv3 eval-realworld-diverse-hemg-mnv3 train-diverse-hemg-effb0 eval-realworld-diverse-hemg-effb0 gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format install-hooks mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
+.PHONY: install download-real download-crossval download-diverse download-hemg sample-train train train-real eval eval-real eval-realworld precrop precrop-clean train-cropped train-cropped-midaug train-cropped-clean eval-realworld-cropped eval-realworld-cropped-midaug eval-realworld-cropped-clean check-overlap train-diverse eval-realworld-diverse train-diverse-midaug eval-realworld-diverse-midaug check-overlap-hemg train-diverse-hemg eval-realworld-diverse-hemg train-diverse-hemg-balanced eval-realworld-diverse-hemg-balanced train-diverse-hemg-mnv3 eval-realworld-diverse-hemg-mnv3 train-diverse-hemg-effb0 eval-realworld-diverse-hemg-effb0 gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format install-hooks gradcam-web mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
 
 # Target Hugging Face Space, e.g. `export HF_SPACE=you/asl-cnn-classifier`.
 HF_SPACE ?=
@@ -161,6 +161,12 @@ eval-realworld-diverse-hemg-effb0:
 # Grad-CAM explainability overlay for a single image (uses sample data here).
 gradcam:
 	$(PY) -m src.gradcam --checkpoint artifacts/checkpoints/best_model.pth --source data/sample/A/0.png --device cpu
+
+# Pre-compute Grad-CAM overlays for the web app's bundled example images
+# (committed to web/public/gradcam/). Grad-CAM needs gradients, so it can't run
+# in-browser — these are shown when a user clicks an example. Run after a retrain.
+gradcam-web:
+	$(PY) scripts/gradcam_web.py --checkpoint artifacts/checkpoints/best_model.pth --device cpu
 
 # Calibration: Expected Calibration Error + reliability diagram on the test split.
 calibration:
