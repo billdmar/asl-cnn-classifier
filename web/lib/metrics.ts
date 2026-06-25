@@ -80,6 +80,32 @@ export interface CalibrationData {
   note: string;
 }
 
+/**
+ * Shape of `public/metrics/realworld_eval.json` — the HONEST cross-dataset
+ * number. The model is evaluated on a DIFFERENT dataset than it trained on
+ * (different signers/backgrounds), so this is far lower than the same-dataset
+ * `Metrics.overall_accuracy` and must never be conflated with it. `*_ay` fields
+ * are the 24-letter A–Y headline (excluding the dynamic motion signs J and Z,
+ * which a single static frame cannot represent — the mainstream convention).
+ */
+export interface RealworldEval {
+  source: string;
+  num_samples: number;
+  hand_crop_used: boolean;
+  num_no_hand_fallback: number;
+  accuracy: number;
+  macro_f1: number;
+  macro_precision: number;
+  macro_recall: number;
+  accuracy_ay: number;
+  macro_f1_ay: number;
+  num_samples_ay: number;
+  per_class: Record<string, ClassMetrics>;
+  most_confused_pairs: ConfusedPair[];
+  checkpoint: string;
+  note: string;
+}
+
 /** A single populated reliability-diagram bin, ready for charting. */
 export interface ReliabilityRow {
   /** Bin midpoint ((lower + upper) / 2) — the x position. */
@@ -136,6 +162,26 @@ export async function fetchCalibration(): Promise<CalibrationData> {
     throw new Error(`Failed to load calibration.json: ${res.status} ${res.statusText}`);
   }
   return (await res.json()) as CalibrationData;
+}
+
+/**
+ * Fetch an honest cross-dataset evaluation. Defaults to the primary gate
+ * (`realworld_eval.json`); pass another name (e.g. `"realworld_eval_gate2"`) to
+ * load a secondary gate. The caller may tolerate a missing secondary gate via
+ * `.catch(() => null)`.
+ *
+ * @param name - Base filename (without extension) under `/metrics/`.
+ * @returns The parsed {@link RealworldEval} object.
+ * @throws If the request fails or returns a non-OK status.
+ */
+export async function fetchRealworldEval(
+  name = "realworld_eval",
+): Promise<RealworldEval> {
+  const res = await fetch(`/metrics/${name}.json`);
+  if (!res.ok) {
+    throw new Error(`Failed to load ${name}.json: ${res.status} ${res.statusText}`);
+  }
+  return (await res.json()) as RealworldEval;
 }
 
 /**

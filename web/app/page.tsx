@@ -79,7 +79,7 @@ export default function HomePage() {
           <SectionShell
             id="how"
             title="How it works"
-            blurb="Hands are detected with MediaPipe, cropped, resized, and ImageNet-normalized, then run through a MobileNetV2 ONNX model with onnxruntime-web — entirely in the browser. Real-world webcam accuracy is lower than the benchmark; a measured number is in progress. Read the full story and model card on the About page."
+            blurb="Hands are detected with MediaPipe, cropped, resized, and ImageNet-normalized, then run through a MobileNetV2 ONNX model with onnxruntime-web — entirely in the browser. Real-world accuracy is lower than the benchmark: the honest cross-dataset number is 59.8% (A–Y) vs the 96.8% same-dataset benchmark. Read the full story and model card on the About page."
           >
             <a
               href="/about"
