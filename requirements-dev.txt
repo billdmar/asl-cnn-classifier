@@ -11,5 +11,10 @@ mypy>=1.8,<2.0
 onnx>=1.16,<2.0
 httpx>=0.27,<1.0
 
+# Perceptual hashing for the opt-in near-duplicate-aware dataset split
+# (make_stratified_splits(dedup=True)) and its tests. Imported lazily, so the
+# core training/serving path does not need it.
+imagehash>=4.3,<5.0
+
 # Type stubs for the mypy gate.
 types-PyYAML>=6.0,<7.0
