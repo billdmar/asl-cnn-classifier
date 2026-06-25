@@ -69,3 +69,27 @@ export function rankFromProbs(
   const top: Prediction = ranked[0] ?? { label: "", index: -1, prob: 0 };
   return { ranked, probs, top };
 }
+
+/** One sample of the top prediction's confidence over time, for the live chart. */
+export interface ConfidencePoint {
+  /** Monotonic frame index (x-axis); not wall-clock, to stay deterministic. */
+  frame: number;
+  /** Smoothed top-1 probability in [0, 1]. */
+  prob: number;
+  /** The top-1 label at this frame. */
+  label: string;
+}
+
+/**
+ * Append a point to a capped ring buffer (oldest dropped past `cap`). Pure: takes
+ * and returns a new array so React state updates stay immutable. Used to drive
+ * the live confidence time-series without unbounded growth.
+ */
+export function pushConfidencePoint(
+  buffer: readonly ConfidencePoint[],
+  point: ConfidencePoint,
+  cap: number,
+): ConfidencePoint[] {
+  const next = [...buffer, point];
+  return next.length > cap ? next.slice(next.length - cap) : next;
+}

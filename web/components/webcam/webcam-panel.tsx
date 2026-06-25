@@ -24,11 +24,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfidenceBars } from "@/components/webcam/confidence-bars";
+import { ConfidenceTimeseries } from "@/components/webcam/confidence-timeseries";
 import { CAPTURE_LETTERS, downloadCanvasAsPng } from "@/components/webcam/capture";
 import {
   averageProbs,
+  pushConfidencePoint,
   rankFromProbs,
   SMOOTHING_WINDOW,
+  type ConfidencePoint,
 } from "@/components/webcam/smoothing";
 import { interpret, type ConfidenceVerdict } from "@/lib/confidence";
 import { cropBoxFromLandmarks, cropToCanvas, type CropBox } from "@/lib/handcrop";
@@ -43,6 +46,9 @@ type CameraState = "idle" | "requesting" | "active" | "denied" | "no-camera" | "
 
 /** Minimum gap between classification runs (ms) — keeps the loop responsive. */
 const CLASSIFY_INTERVAL_MS = 120;
+
+/** Frames of top-1 confidence kept for the live sparkline (~5s at 8fps). */
+const CONFIDENCE_HISTORY_CAP = 40;
 /** Rolling-average window for the FPS readout. */
 const FPS_SMOOTHING = 0.9;
 /**
@@ -78,6 +84,9 @@ export function WebcamPanel() {
   const [verdict, setVerdict] = useState<ConfidenceVerdict | null>(null);
   const [handFound, setHandFound] = useState(false);
   const [fps, setFps] = useState(0);
+  /** Capped history of the smoothed top-1 confidence for the live sparkline. */
+  const [confHistory, setConfHistory] = useState<ConfidencePoint[]>([]);
+  const confFrameRef = useRef(0);
   const [captureLetter, setCaptureLetter] = useState("A");
   const [captureCount, setCaptureCount] = useState(0);
 
@@ -143,6 +152,7 @@ export function WebcamPanel() {
           lastCropRef.current = null;
           setResult(null);
           setVerdict(null);
+          setConfHistory([]);
         }
 
         // Throttle the expensive classify step; skip if one is in flight.
@@ -174,6 +184,14 @@ export function WebcamPanel() {
               const smoothed = rankFromProbs(averageProbs(buffer), CLASS_NAMES);
               setResult(smoothed);
               setVerdict(interpret(smoothed));
+              const frame = (confFrameRef.current += 1);
+              setConfHistory((h) =>
+                pushConfidencePoint(
+                  h,
+                  { frame, prob: smoothed.top.prob, label: smoothed.top.label },
+                  CONFIDENCE_HISTORY_CAP,
+                ),
+              );
             })
             .catch(() => {
               /* transient inference error — keep the loop alive */
@@ -219,6 +237,7 @@ export function WebcamPanel() {
     setFps(0);
     setResult(null);
     setVerdict(null);
+    setConfHistory([]);
     setCameraState("idle");
   }, []);
 
@@ -391,6 +410,10 @@ export function WebcamPanel() {
           </div>
 
           {result && <ConfidenceBars ranked={result.ranked} unsure={showUnsure} />}
+
+          {confHistory.length > 1 && (
+            <ConfidenceTimeseries points={confHistory} />
+          )}
 
           {/* Guidance */}
           <div className="rounded-lg border border-border bg-bg p-3 text-xs text-fg-subtle">

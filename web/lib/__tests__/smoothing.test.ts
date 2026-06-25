@@ -4,7 +4,12 @@
 
 import { describe, it, expect } from "vitest";
 
-import { averageProbs, rankFromProbs } from "../../components/webcam/smoothing";
+import {
+  averageProbs,
+  pushConfidencePoint,
+  rankFromProbs,
+  type ConfidencePoint,
+} from "../../components/webcam/smoothing";
 
 describe("averageProbs", () => {
   it("returns an empty vector for empty input", () => {
@@ -69,5 +74,24 @@ describe("rankFromProbs", () => {
     const result = rankFromProbs(new Float32Array(0), labels);
     expect(result.ranked).toHaveLength(0);
     expect(result.top).toEqual({ label: "", index: -1, prob: 0 });
+  });
+});
+
+describe("pushConfidencePoint", () => {
+  const pt = (frame: number): ConfidencePoint => ({ frame, prob: 0.5, label: "A" });
+
+  it("appends a point immutably", () => {
+    const buf: ConfidencePoint[] = [pt(1)];
+    const next = pushConfidencePoint(buf, pt(2), 10);
+    expect(next).toHaveLength(2);
+    expect(buf).toHaveLength(1); // original untouched
+    expect(next[next.length - 1]!.frame).toBe(2);
+  });
+
+  it("drops the oldest past the cap (ring buffer)", () => {
+    let buf: ConfidencePoint[] = [];
+    for (let i = 1; i <= 5; i++) buf = pushConfidencePoint(buf, pt(i), 3);
+    expect(buf).toHaveLength(3);
+    expect(buf.map((p) => p.frame)).toEqual([3, 4, 5]);
   });
 });
