@@ -194,9 +194,14 @@ def test_get_union_class_names_unions_across_dirs(tmp_path):
     az = tmp_path / "az"
     ay = tmp_path / "ay"
     _make_class_dataset(az, [chr(c) for c in range(ord("A"), ord("Z") + 1)])
-    _make_class_dataset(ay, [c for c in
-                             (chr(x) for x in range(ord("A"), ord("Z") + 1))
-                             if c not in ("J", "Z")])
+    _make_class_dataset(
+        ay,
+        [
+            c
+            for c in (chr(x) for x in range(ord("A"), ord("Z") + 1))
+            if c not in ("J", "Z")
+        ],
+    )
     union = dataset.get_union_class_names([az, ay])
     assert union == [chr(c) for c in range(ord("A"), ord("Z") + 1)]
     assert "J" in union and "Z" in union

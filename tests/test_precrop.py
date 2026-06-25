@@ -47,14 +47,10 @@ def test_drop_sketches_excludes_line_drawings(tmp_path, monkeypatch):
 
     # Stub out MediaPipe: pretend every image has a detectable hand (identity crop).
     monkeypatch.setattr(pc, "_build_landmarker", lambda _p: _FakeLandmarker())
-    monkeypatch.setattr(
-        pc, "detect_and_crop", lambda image, **kw: image, raising=True
-    )
+    monkeypatch.setattr(pc, "detect_and_crop", lambda image, **kw: image, raising=True)
 
     out = tmp_path / "cropped"
-    report = pc.precrop_dataset(
-        in_dir=tmp_path, out_dir=out, drop_sketches=True
-    )
+    report = pc.precrop_dataset(in_dir=tmp_path, out_dir=out, drop_sketches=True)
 
     assert report["total_images"] == 3
     assert report["total_sketches"] == 1

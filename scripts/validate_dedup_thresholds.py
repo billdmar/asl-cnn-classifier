@@ -76,10 +76,14 @@ def _print_stats(label: str, stats: dict) -> None:
 def main() -> int:
     class_names = dataset.get_class_names(DATA_DIR)
     samples = dataset._list_samples(DATA_DIR, class_names)
-    print(f"Loaded {len(samples)} samples across {len(class_names)} classes "
-          f"from {DATA_DIR}")
-    print(f"Shipped constants: THRESHOLD={DEDUP_PHASH_THRESHOLD}, "
-          f"WINDOW={DEDUP_WINDOW}")
+    print(
+        f"Loaded {len(samples)} samples across {len(class_names)} classes "
+        f"from {DATA_DIR}"
+    )
+    print(
+        f"Shipped constants: THRESHOLD={DEDUP_PHASH_THRESHOLD}, "
+        f"WINDOW={DEDUP_WINDOW}"
+    )
 
     # 1 + 3: lexical (as _list_samples returns) vs numeric frame order.
     lex_ids = _phash_groups(samples)
@@ -90,15 +94,18 @@ def main() -> int:
     _print_stats("numeric frame order", _cluster_stats(num_ids))
 
     # 2: threshold sweep at the shipped window, numeric order (true sequence).
-    print("\n[threshold sweep — numeric order, window="
-          f"{DEDUP_WINDOW}]")
-    print(f"  {'thresh':>6}  {'clusters':>9}  {'frames/clu':>10}  "
-          f"{'largest':>8}  {'singletons':>10}")
+    print("\n[threshold sweep — numeric order, window=" f"{DEDUP_WINDOW}]")
+    print(
+        f"  {'thresh':>6}  {'clusters':>9}  {'frames/clu':>10}  "
+        f"{'largest':>8}  {'singletons':>10}"
+    )
     for thr in (8, 12, 16, 18, 20, 22, 24, 28, 32):
         ids = _phash_groups(numeric_samples, threshold=thr)
         s = _cluster_stats(ids)
-        print(f"  {thr:>6}  {s['n_groups']:>9}  {s['compression']:>10.2f}  "
-              f"{s['largest_cluster']:>8}  {s['singletons']:>10}")
+        print(
+            f"  {thr:>6}  {s['n_groups']:>9}  {s['compression']:>10.2f}  "
+            f"{s['largest_cluster']:>8}  {s['singletons']:>10}"
+        )
 
     # Window sweep at shipped threshold — does a wider window chain more?
     print(f"\n[window sweep — numeric order, threshold={DEDUP_PHASH_THRESHOLD}]")
@@ -106,8 +113,10 @@ def main() -> int:
     for win in (2, 4, 8, 16, 32):
         ids = _phash_groups(numeric_samples, window=win)
         s = _cluster_stats(ids)
-        print(f"  {win:>6}  {s['n_groups']:>9}  {s['compression']:>10.2f}  "
-              f"{s['largest_cluster']:>8}")
+        print(
+            f"  {win:>6}  {s['n_groups']:>9}  {s['compression']:>10.2f}  "
+            f"{s['largest_cluster']:>8}"
+        )
 
     return 0
 

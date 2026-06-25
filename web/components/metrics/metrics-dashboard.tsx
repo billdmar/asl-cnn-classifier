@@ -23,7 +23,6 @@ import { ReliabilityChart } from "./reliability-chart";
 import { StatCards, type Stat } from "./stat-cards";
 import { TrainingChart } from "./training-chart";
 
-const SOURCE = "measured on the held-out test set (1,631 images)";
 
 type LoadState =
   | { status: "loading" }
@@ -115,6 +114,9 @@ export function MetricsDashboard() {
   }
 
   const { metrics, history, calibration, realworld, gate2 } = state;
+  // Derive the provenance string from the data so it can never drift from the
+  // committed metrics (e.g. after a retrain changes the test-set size).
+  const SOURCE = `measured on the held-out test set (${metrics.num_test_samples.toLocaleString()} images)`;
   const best = bestValEpoch(history);
   const classRows = toClassRows(metrics.per_class);
   const pairs = topConfusedPairs(metrics.most_confused_pairs, 10);

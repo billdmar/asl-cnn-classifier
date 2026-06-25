@@ -40,7 +40,7 @@ export function Hero() {
 
         <p className="mt-6 max-w-2xl text-pretty text-lg text-fg-muted">
           100% in-browser inference · webcam frames never leave your device · MobileNetV2,
-          96.8% held-out test accuracy.
+          59.8% honest cross-dataset accuracy (A–Y) vs 96.9% same-dataset.
         </p>
 
         <div className="mt-8 flex w-full animate-fade-up flex-col items-center gap-3 [animation-delay:240ms] sm:w-auto sm:flex-row">

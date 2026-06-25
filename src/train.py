@@ -370,7 +370,9 @@ def main() -> None:
         inv = np.where(counts > 0, counts.sum() / (counts * len(counts)), 0.0)
         inv = inv / inv[inv > 0].mean() if (inv > 0).any() else inv
         class_weight = torch.tensor(inv, dtype=torch.float32, device=device)
-        print(f"Class-weighted loss (inverse-frequency) enabled: {class_weight.tolist()}")
+        print(
+            f"Class-weighted loss (inverse-frequency) enabled: {class_weight.tolist()}"
+        )
     criterion = nn.CrossEntropyLoss(weight=class_weight)
     optimizer = build_optimizer(model, config, base_lr)
     scheduler = build_scheduler(optimizer, config, t_max=num_epochs)

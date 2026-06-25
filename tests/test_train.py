@@ -210,7 +210,8 @@ def test_main_multi_dir_merge_end_to_end(tmp_path, monkeypatch, capsys):
     assert "Multi-source training on 2 dirs" in out
 
     ckpt = torch.load(
-        tmp_path / "checkpoints" / "best_model.pth", map_location="cpu",
+        tmp_path / "checkpoints" / "best_model.pth",
+        map_location="cpu",
         weights_only=False,
     )
     assert ckpt["class_names"] == ["A", "B", "C"]

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { test, expect } from "@playwright/test";
 
 /**
@@ -6,8 +9,21 @@ import { test, expect } from "@playwright/test";
  * the correct predicted letter. This is the centerpiece honesty check — it
  * proves the deployed model genuinely classifies, not just that the UI renders.
  *
- * The metrics dashboard assertion proves the real committed JSON drives the UI.
+ * The metrics-dashboard assertions are DATA-DRIVEN: they read the committed
+ * metrics/calibration JSON and assert the dashboard renders those exact values
+ * (formatted the same way the component does). This tracks retrains automatically
+ * instead of pinning hardcoded numbers that rot.
  */
+
+const METRICS_DIR = path.resolve(__dirname, "../public/metrics");
+const metricsJson = JSON.parse(
+  readFileSync(path.join(METRICS_DIR, "metrics.json"), "utf-8"),
+) as { overall_accuracy: number; num_test_samples: number };
+const calibrationJson = JSON.parse(
+  readFileSync(path.join(METRICS_DIR, "calibration.json"), "utf-8"),
+) as { ece: number };
+
+const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
 test.describe("in-browser inference", () => {
   test("classifying the bundled A example predicts A", async ({ page }) => {
@@ -33,10 +49,14 @@ test.describe("in-browser inference", () => {
   test("metrics dashboard renders the real measured numbers", async ({ page }) => {
     await page.goto("/");
     const metrics = page.locator("#metrics");
-    // These come from the committed metrics.json / training_history.json.
-    await expect(metrics).toContainText("96.8%", { timeout: 15_000 });
-    await expect(metrics).toContainText("97.8%", { timeout: 15_000 });
-    await expect(metrics).toContainText("1,631", { timeout: 15_000 });
+    // Derived from the committed metrics.json — tracks retrains automatically.
+    await expect(metrics).toContainText(pct(metricsJson.overall_accuracy), {
+      timeout: 15_000,
+    });
+    await expect(metrics).toContainText(
+      metricsJson.num_test_samples.toLocaleString("en-US"),
+      { timeout: 15_000 },
+    );
   });
 
   test("calibration card renders real measured ECE (not a placeholder)", async ({
@@ -44,9 +64,11 @@ test.describe("in-browser inference", () => {
   }) => {
     await page.goto("/");
     const metrics = page.locator("#metrics");
-    // From the real calibration.json (ECE 0.046 on the held-out test set).
+    // From the real calibration.json — value read, not hardcoded.
     await expect(metrics).toContainText("ECE", { timeout: 15_000 });
-    await expect(metrics).toContainText("0.046", { timeout: 15_000 });
+    await expect(metrics).toContainText(calibrationJson.ece.toFixed(3), {
+      timeout: 15_000,
+    });
     // The "coming soon" placeholder must be gone.
     await expect(metrics).not.toContainText(/coming with the calibration/i);
   });
