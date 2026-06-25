@@ -1,0 +1,47 @@
+# Training configuration — 3-SOURCE diverse fine-tune (Experiment D3).
+#
+# Adds Hemg (plain-bg, single-signer, but INCLUDES static J/Z frames) as a 3rd
+# training source on top of the deployed D1 union (Marxulia + aliciiavs). Goal:
+# more data + the only available static J/Z examples, to push the honest
+# cross-dataset number above D1's 47.6% / A-Y 51.4%.
+#
+# Hemg was vetted as TRAINING-ONLY: scripts/check_eval_overlap.py shows 0%
+# overlap with the EitanG98 eval gate, but Hemg's own frames are 76% internally
+# near-duplicated, so it CANNOT serve as a held-out gate — EitanG98 stays the
+# sole honest gate. Standard aug (proven best). Separate checkpoint dir.
+
+# Data — union of all three vetted training sources.
+data_dir:
+  - data/asl_real
+  - data/asl_diverse
+  - data/asl_hemg
+image_size: 128
+train_frac: 0.70
+val_frac: 0.15
+test_frac: 0.15
+
+# Model
+arch: mobilenet_v2
+num_classes: 26
+pretrained: true
+
+# Optimization (deployed recipe)
+batch_size: 64
+num_epochs: 12
+learning_rate: 0.001
+weight_decay: 0.0001
+optimizer: adamw
+lr_scheduler: cosine
+warmup_epochs: 3
+
+# Training behavior
+seed: 42
+num_workers: 4
+amp: false
+early_stopping_patience: 5
+device: auto
+augmentation: standard
+
+# Output — SEPARATE dir; never clobber the deployed baseline or D1.
+checkpoint_dir: artifacts/checkpoints_diverse_hemg
+tensorboard_dir: artifacts/runs
