@@ -1,0 +1,30 @@
+# Architecture experiment (Phase 3): 3-source union, arch = efficientnet_b0.
+# Gated HARD on the cross-dataset metric vs the deployed MobileNetV2 D3 (55.5% /
+# A-Y 59.8%). Abandon if it does not beat the incumbent by >=+2-3 pts on BOTH
+# the 26-class and A-Y numbers — a smaller/different backbone may LOSE on ~21k imgs.
+data_dir:
+  - data/asl_real
+  - data/asl_diverse
+  - data/asl_hemg
+image_size: 128
+train_frac: 0.70
+val_frac: 0.15
+test_frac: 0.15
+arch: efficientnet_b0
+num_classes: 26
+pretrained: true
+batch_size: 64
+num_epochs: 12
+learning_rate: 0.001
+weight_decay: 0.0001
+optimizer: adamw
+lr_scheduler: cosine
+warmup_epochs: 3
+seed: 42
+num_workers: 4
+amp: false
+early_stopping_patience: 5
+device: auto
+augmentation: standard
+checkpoint_dir: artifacts/checkpoints_diverse_hemg_efficientnet_b0
+tensorboard_dir: artifacts/runs

@@ -3,7 +3,7 @@
 
 PY := .venv/bin/python
 
-.PHONY: install download-real download-crossval download-diverse download-hemg sample-train train train-real eval eval-real eval-realworld precrop precrop-clean train-cropped train-cropped-midaug train-cropped-clean eval-realworld-cropped eval-realworld-cropped-midaug eval-realworld-cropped-clean check-overlap train-diverse eval-realworld-diverse train-diverse-midaug eval-realworld-diverse-midaug check-overlap-hemg train-diverse-hemg eval-realworld-diverse-hemg gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
+.PHONY: install download-real download-crossval download-diverse download-hemg sample-train train train-real eval eval-real eval-realworld precrop precrop-clean train-cropped train-cropped-midaug train-cropped-clean eval-realworld-cropped eval-realworld-cropped-midaug eval-realworld-cropped-clean check-overlap train-diverse eval-realworld-diverse train-diverse-midaug eval-realworld-diverse-midaug check-overlap-hemg train-diverse-hemg eval-realworld-diverse-hemg train-diverse-hemg-balanced eval-realworld-diverse-hemg-balanced train-diverse-hemg-mnv3 eval-realworld-diverse-hemg-mnv3 train-diverse-hemg-effb0 eval-realworld-diverse-hemg-effb0 gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
 
 # Target Hugging Face Space, e.g. `export HF_SPACE=you/asl-cnn-classifier`.
 HF_SPACE ?=
@@ -141,6 +141,22 @@ train-diverse-hemg:
 	$(PY) -m src.train --config configs/train_real_mobilenet_diverse_hemg.yaml
 eval-realworld-diverse-hemg:
 	$(PY) -m src.eval_realworld --checkpoint artifacts/checkpoints_diverse_hemg/best_model.pth --data_dir data/asl_crossval --output artifacts/realworld_eval_diverse_hemg.json
+
+# Experiment D4: 3-source + inverse-frequency class-balanced loss (curb the S sink).
+train-diverse-hemg-balanced:
+	$(PY) -m src.train --config configs/train_diverse_hemg_balanced.yaml
+eval-realworld-diverse-hemg-balanced:
+	$(PY) -m src.eval_realworld --checkpoint artifacts/checkpoints_diverse_hemg_balanced/best_model.pth --data_dir data/asl_crossval --output artifacts/realworld_eval_diverse_hemg_balanced.json
+
+# Phase 3 architecture experiments (gated hard vs deployed MobileNetV2 D3).
+train-diverse-hemg-mnv3:
+	$(PY) -m src.train --config configs/train_diverse_hemg_mobilenet_v3_small.yaml
+eval-realworld-diverse-hemg-mnv3:
+	$(PY) -m src.eval_realworld --checkpoint artifacts/checkpoints_diverse_hemg_mobilenet_v3_small/best_model.pth --data_dir data/asl_crossval --output artifacts/realworld_eval_diverse_hemg_mnv3.json
+train-diverse-hemg-effb0:
+	$(PY) -m src.train --config configs/train_diverse_hemg_efficientnet_b0.yaml
+eval-realworld-diverse-hemg-effb0:
+	$(PY) -m src.eval_realworld --checkpoint artifacts/checkpoints_diverse_hemg_efficientnet_b0/best_model.pth --data_dir data/asl_crossval --output artifacts/realworld_eval_diverse_hemg_effb0.json
 
 # Grad-CAM explainability overlay for a single image (uses sample data here).
 gradcam:
