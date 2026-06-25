@@ -102,8 +102,49 @@ export interface RealworldEval {
   num_samples_ay: number;
   per_class: Record<string, ClassMetrics>;
   most_confused_pairs: ConfusedPair[];
+  /** Class labels for the confusion matrix axes (row/col order). */
+  confusion_labels: string[];
+  /** Dense confusion matrix; `confusion_matrix[i][j]` = true i predicted j. */
+  confusion_matrix: number[][];
   checkpoint: string;
   note: string;
+}
+
+/** A confusion-matrix cell normalized to a row fraction, ready for a heatmap. */
+export interface ConfusionCell {
+  trueLabel: string;
+  predLabel: string;
+  count: number;
+  /** count / row total (recall-normalized); 0 when the row is empty. */
+  fraction: number;
+  isDiagonal: boolean;
+}
+
+/**
+ * Row-normalize a confusion matrix into flat cells for heatmap rendering.
+ * Each row is divided by its support so color encodes recall, not raw count
+ * (classes have unequal support). Pure.
+ */
+export function confusionCells(
+  matrix: number[][],
+  labels: string[],
+): ConfusionCell[] {
+  const cells: ConfusionCell[] = [];
+  for (let i = 0; i < matrix.length; i++) {
+    const row = matrix[i] ?? [];
+    const rowTotal = row.reduce((a, b) => a + b, 0);
+    for (let j = 0; j < row.length; j++) {
+      const count = row[j] ?? 0;
+      cells.push({
+        trueLabel: labels[i] ?? String(i),
+        predLabel: labels[j] ?? String(j),
+        count,
+        fraction: rowTotal > 0 ? count / rowTotal : 0,
+        isDiagonal: i === j,
+      });
+    }
+  }
+  return cells;
 }
 
 /** A single populated reliability-diagram bin, ready for charting. */

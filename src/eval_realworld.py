@@ -330,6 +330,7 @@ def _build_metrics(
             for name in class_names
         }
         confused: list[dict[str, Any]] = []
+        confusion: list[list[int]] = []
     else:
         report = classification_report(
             y_true,
@@ -351,6 +352,7 @@ def _build_metrics(
             }
         cm = confusion_matrix(y_true, y_pred, labels=labels)
         confused = most_confused_pairs(cm, class_names, top_k=10)
+        confusion = cm.astype(int).tolist()
 
     # Headline A–Y metric (exclude the dynamic J/Z): the defensible mainstream
     # convention for a static-frame classifier. The full 26-class number stays
@@ -371,6 +373,8 @@ def _build_metrics(
         "num_samples_ay": ay["num_samples"],
         "per_class": per_class,
         "most_confused_pairs": confused,
+        "confusion_labels": list(class_names),
+        "confusion_matrix": confusion,
         "checkpoint": str(checkpoint),
         "note": HONEST_NOTE,
     }

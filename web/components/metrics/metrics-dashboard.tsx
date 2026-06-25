@@ -18,6 +18,7 @@ import {
 } from "@/lib/metrics";
 
 import { ConfusedPairs } from "./confused-pairs";
+import { ConfusionHeatmap } from "./confusion-heatmap";
 import { PerClassChart } from "./per-class-chart";
 import { ReliabilityChart } from "./reliability-chart";
 import { StatCards, type Stat } from "./stat-cards";
@@ -208,6 +209,28 @@ export function MetricsDashboard() {
           <p className="mt-3 text-xs text-fg-subtle">{realworld.note}</p>
         </CardContent>
       </Card>
+
+      {realworld.confusion_matrix.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Where it gets confused (cross-dataset)</CardTitle>
+            <p className="text-sm text-fg-muted">
+              The full 26×26 confusion matrix on the held-out cross-dataset set, plus
+              the most-frequent mistakes. This is the honest failure map — closed-hand
+              signs (S, N, M, T) collapse into each other on unfamiliar hands.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
+              <ConfusionHeatmap data={realworld} />
+              <div>
+                <h3 className="mb-2 text-sm font-medium text-fg">Top confusions</h3>
+                <ConfusedPairs pairs={realworld.most_confused_pairs.slice(0, 8)} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <StatCards stats={stats} />
 

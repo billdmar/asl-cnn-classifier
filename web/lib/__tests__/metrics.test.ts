@@ -13,6 +13,7 @@ import {
   topConfusedPairs,
   bestValEpoch,
   toReliabilityRows,
+  confusionCells,
   type CalibrationData,
   type Metrics,
   type RealworldEval,
@@ -139,5 +140,44 @@ describe("realworld_eval (honest cross-dataset number)", () => {
 
   it("carries an honest cross-dataset note", () => {
     expect(realworld.note.toLowerCase()).toContain("cross-dataset");
+  });
+
+  it("ships a square 26×26 confusion matrix aligned to its labels", () => {
+    expect(realworld.confusion_labels).toHaveLength(26);
+    expect(realworld.confusion_matrix).toHaveLength(26);
+    for (const row of realworld.confusion_matrix) {
+      expect(row).toHaveLength(26);
+    }
+  });
+
+  it("confusion row sums equal per-class support (recall denominator)", () => {
+    realworld.confusion_labels.forEach((label, i) => {
+      const rowSum = realworld.confusion_matrix[i]!.reduce((a, b) => a + b, 0);
+      expect(rowSum).toBe(realworld.per_class[label]!.support);
+    });
+  });
+});
+
+describe("confusionCells", () => {
+  it("row-normalizes counts into recall fractions and flags the diagonal", () => {
+    const cells = confusionCells(
+      [
+        [8, 2],
+        [0, 5],
+      ],
+      ["A", "B"],
+    );
+    expect(cells).toHaveLength(4);
+    const aa = cells.find((c) => c.trueLabel === "A" && c.predLabel === "A")!;
+    expect(aa.isDiagonal).toBe(true);
+    expect(aa.fraction).toBeCloseTo(0.8, 10); // 8 / (8+2)
+    const ab = cells.find((c) => c.trueLabel === "A" && c.predLabel === "B")!;
+    expect(ab.isDiagonal).toBe(false);
+    expect(ab.fraction).toBeCloseTo(0.2, 10);
+  });
+
+  it("handles an empty row without dividing by zero", () => {
+    const cells = confusionCells([[0, 0]], ["A", "B"]);
+    expect(cells.every((c) => c.fraction === 0)).toBe(true);
   });
 });
