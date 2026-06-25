@@ -3,7 +3,7 @@
 
 PY := .venv/bin/python
 
-.PHONY: install download-real download-crossval download-diverse download-hemg sample-train train train-real eval eval-real eval-realworld precrop precrop-clean train-cropped train-cropped-midaug train-cropped-clean eval-realworld-cropped eval-realworld-cropped-midaug eval-realworld-cropped-clean check-overlap train-diverse eval-realworld-diverse gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
+.PHONY: install download-real download-crossval download-diverse download-hemg sample-train train train-real eval eval-real eval-realworld precrop precrop-clean train-cropped train-cropped-midaug train-cropped-clean eval-realworld-cropped eval-realworld-cropped-midaug eval-realworld-cropped-clean check-overlap train-diverse eval-realworld-diverse train-diverse-midaug eval-realworld-diverse-midaug gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
 
 # Target Hugging Face Space, e.g. `export HF_SPACE=you/asl-cnn-classifier`.
 HF_SPACE ?=
@@ -125,6 +125,13 @@ train-diverse:
 # Gate D1 on the cross-dataset set (distinct artifact).
 eval-realworld-diverse:
 	$(PY) -m src.eval_realworld --checkpoint artifacts/checkpoints_diverse/best_model.pth --data_dir data/asl_crossval --output artifacts/realworld_eval_diverse.json
+
+# Experiment D2: diverse merge + medium augmentation (push past D1).
+train-diverse-midaug:
+	$(PY) -m src.train --config configs/train_real_mobilenet_diverse_midaug.yaml
+
+eval-realworld-diverse-midaug:
+	$(PY) -m src.eval_realworld --checkpoint artifacts/checkpoints_diverse_midaug/best_model.pth --data_dir data/asl_crossval --output artifacts/realworld_eval_diverse_midaug.json
 
 # Grad-CAM explainability overlay for a single image (uses sample data here).
 gradcam:
