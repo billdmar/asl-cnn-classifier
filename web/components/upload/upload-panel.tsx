@@ -26,6 +26,13 @@ const EXAMPLES: ReadonlyArray<{ src: string; label: string }> = [
   { src: "/examples/Y.png", label: "Y" },
 ];
 
+/**
+ * Labels with a pre-computed Grad-CAM overlay in public/gradcam/. Grad-CAM needs
+ * backward gradients, which the in-browser engine can't provide, so we precompute
+ * (make gradcam-web) only for the fixed bundled examples and show them on click.
+ */
+const GRADCAM_LABELS = new Set(EXAMPLES.map((e) => e.label));
+
 type Status = "idle" | "loading" | "done" | "error";
 
 interface Outcome {
@@ -58,6 +65,7 @@ export function UploadPanel() {
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [trueLabel, setTrueLabel] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [showGradcam, setShowGradcam] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   // Track the most recent object URL so we can revoke the previous one.
@@ -88,6 +96,7 @@ export function UploadPanel() {
     setOutcome(null);
     setTrueLabel(knownLabel);
     setPreviewUrl(url);
+    setShowGradcam(false);
     try {
       const img = await loadImage(url);
 
@@ -335,6 +344,35 @@ export function UploadPanel() {
                   count={5}
                   unsure={outcome.verdict.unsure}
                 />
+
+                {trueLabel && GRADCAM_LABELS.has(trueLabel) && (
+                  <div className="border-t border-border-subtle pt-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowGradcam((s) => !s)}
+                      aria-expanded={showGradcam}
+                      className="text-xs font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      {showGradcam ? "Hide" : "Show"} what the model looked at →
+                    </button>
+                    {showGradcam && (
+                      <div className="mt-3 flex flex-col gap-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`/gradcam/${trueLabel}.png`}
+                          alt={`Grad-CAM heatmap for ${trueLabel}: warmer regions influenced the prediction more`}
+                          className="max-h-44 self-start rounded-lg object-contain"
+                        />
+                        <p className="text-xs text-fg-subtle">
+                          Grad-CAM saliency — red regions drove the prediction, blue
+                          mattered least. Pre-computed offline (in-browser inference
+                          can&apos;t expose the gradients Grad-CAM needs), so it&apos;s
+                          shown for the bundled examples only.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
