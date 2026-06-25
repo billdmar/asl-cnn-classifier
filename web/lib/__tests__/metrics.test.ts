@@ -41,9 +41,9 @@ describe("toClassRows", () => {
     const rows = toClassRows(metrics.per_class);
     expect(rows[0]?.letter).toBe("A");
     expect(rows[25]?.letter).toBe("Z");
-    // A is a perfect class in the real data.
-    expect(rows[0]?.f1).toBe(1.0);
-    expect(rows[0]?.support).toBe(63);
+    // A is a near-perfect class in the real data.
+    expect(rows[0]?.f1).toBeCloseTo(0.9965156794425087, 10);
+    expect(rows[0]?.support).toBe(144);
   });
 
   it("sorts ascending by F1 (worst class first)", () => {
@@ -51,9 +51,9 @@ describe("toClassRows", () => {
     const f1s = rows.map((r) => r.f1);
     const sorted = [...f1s].sort((a, b) => a - b);
     expect(f1s).toEqual(sorted);
-    // N has the lowest F1 in the real data (0.92561…).
+    // N has the lowest F1 in the real data.
     expect(rows[0]?.letter).toBe("N");
-    expect(rows[0]?.f1).toBeCloseTo(0.9256198347107438, 10);
+    expect(rows[0]?.f1).toBeCloseTo(0.9178743961352657, 10);
   });
 });
 
@@ -61,8 +61,8 @@ describe("topConfusedPairs", () => {
   it("ranks by descending count and is capped at N", () => {
     const top = topConfusedPairs(metrics.most_confused_pairs, 3);
     expect(top).toHaveLength(3);
-    expect(top[0]).toEqual({ true: "P", pred: "Q", count: 4 });
-    expect(top[1]).toEqual({ true: "V", pred: "W", count: 4 });
+    expect(top[0]).toEqual({ true: "N", pred: "M", count: 8 });
+    expect(top[1]).toEqual({ true: "X", pred: "I", count: 4 });
     expect(top[0]!.count).toBeGreaterThanOrEqual(top[2]!.count);
   });
 
@@ -76,8 +76,8 @@ describe("topConfusedPairs", () => {
 describe("toReliabilityRows", () => {
   it("drops empty bins and keeps only populated ones from the real data", () => {
     const rows = toReliabilityRows(calibration.bins);
-    // First two bins (lowers 0.0 and 0.1) have count 0; 8 of 10 remain.
-    expect(rows).toHaveLength(8);
+    // Only the [0.0, 0.1] bin is empty; 9 of 10 remain populated.
+    expect(rows).toHaveLength(9);
     expect(rows.every((r) => r.count > 0)).toBe(true);
   });
 
@@ -88,12 +88,12 @@ describe("toReliabilityRows", () => {
     expect(last?.midpoint).toBeCloseTo(0.95, 10);
     expect(last?.lower).toBe(0.9);
     expect(last?.upper).toBe(1.0);
-    expect(last?.acc).toBeCloseTo(0.9968919968919969, 10);
-    expect(last?.conf).toBeCloseTo(0.9768822673410061, 10);
-    expect(last?.count).toBe(1287);
-    // The first populated bin is [0.2, 0.3] with 2 samples.
-    expect(rows[0]?.midpoint).toBeCloseTo(0.25, 10);
-    expect(rows[0]?.count).toBe(2);
+    expect(last?.acc).toBeCloseTo(0.9987725040916531, 10);
+    expect(last?.conf).toBeCloseTo(0.9856753365844564, 10);
+    expect(last?.count).toBe(2444);
+    // The first populated bin is [0.1, 0.2] with 1 sample.
+    expect(rows[0]?.midpoint).toBeCloseTo(0.15, 10);
+    expect(rows[0]?.count).toBe(1);
   });
 
   it("returns rows in ascending-confidence (JSON) order", () => {
@@ -107,7 +107,7 @@ describe("bestValEpoch", () => {
   it("finds the peak validation-accuracy epoch from the real history", () => {
     const best = bestValEpoch(history);
     expect(best?.epoch).toBe(12);
-    expect(best?.val_acc).toBeCloseTo(0.9779276517473943, 10);
+    expect(best?.val_acc).toBeCloseTo(0.9613393165343459, 10);
   });
 
   it("returns undefined for empty history", () => {
