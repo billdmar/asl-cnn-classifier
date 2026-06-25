@@ -12,8 +12,12 @@ Mechanism (reuses the codebase's perceptual-hash machinery): for each class
 present in BOTH the train dir and the eval dir, compute ``imagehash.phash`` for
 every image, then for each training image find its minimum Hamming distance to
 any **same-class** eval image. A distance ``<= threshold`` (default
-``DEDUP_PHASH_THRESHOLD = 22``, the same radius the dataset dedup uses) is flagged
-as a near-duplicate. Class-scoped comparison keeps it tractable.
+``CROSS_DATASET_PHASH_THRESHOLD = 10``) is flagged as a near-duplicate.
+Class-scoped comparison keeps it tractable. NOTE: 10 is much tighter than the
+sequential-video dedup radius (22) — across two photo datasets, distinct photos
+of the same static sign collide at ~16-26 from shared coarse structure, so 22
+floods with false positives; a true re-encode/resize/crop of the same image
+lands at <=~8. See the constant's comment for the empirical justification.
 
 Read-only by default — prints a per-class report, a min-distance histogram, the
 closest pairs, and writes ``<train_dir>/_overlap_report.json``. Opt-in mutation:
@@ -37,7 +41,19 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.dataset import DEDUP_PHASH_THRESHOLD, get_class_names  # noqa: E402
+from src.dataset import get_class_names  # noqa: E402
+
+# Cross-dataset near-duplicate threshold (pHash Hamming distance). This is much
+# tighter than the sequential-video DEDUP_PHASH_THRESHOLD (22): that radius is
+# tuned for consecutive frames of ONE recording, but across two different photo
+# datasets, distinct photos of the SAME static sign (same letter, centered hand,
+# plain background) collide at distance ~16-26 from shared coarse structure
+# alone. Empirically (aliciiavs vs EitanG98) the min-distance distribution is a
+# clean bell centered at 24 with ZERO images at d<=10 — so a true re-encode /
+# resize / crop of the same image (which lands at <=~8) is well separated from
+# same-sign-different-photo collisions. 10 catches real dups without the
+# false-positive flood that threshold 22 produces (~36% of legit images).
+CROSS_DATASET_PHASH_THRESHOLD = 10
 
 # Above this fraction of training images flagged, the candidate set is considered
 # contaminated and must be cleaned (--remove/--exclude-manifest) before training.
@@ -60,7 +76,7 @@ def _phash_dir(class_dir: Path) -> list[tuple[Path, Any]]:
 def check_overlap(
     train_dir: str | Path,
     eval_dir: str | Path = "data/asl_crossval",
-    threshold: int = DEDUP_PHASH_THRESHOLD,
+    threshold: int = CROSS_DATASET_PHASH_THRESHOLD,
 ) -> dict:
     """Scan ``train_dir`` for near-duplicates of ``eval_dir`` (same-class pHash).
 
@@ -137,8 +153,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--threshold",
         type=int,
-        default=DEDUP_PHASH_THRESHOLD,
-        help=f"pHash Hamming distance for a near-dup (default {DEDUP_PHASH_THRESHOLD}).",
+        default=CROSS_DATASET_PHASH_THRESHOLD,
+        help=(
+            "pHash Hamming distance for a cross-dataset near-dup "
+            f"(default {CROSS_DATASET_PHASH_THRESHOLD}; tighter than the "
+            "sequential-video dedup radius of 22 — see module docstring)."
+        ),
     )
     parser.add_argument(
         "--remove",

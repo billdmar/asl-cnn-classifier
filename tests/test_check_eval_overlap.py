@@ -42,6 +42,35 @@ def test_planted_duplicate_is_flagged_randoms_are_not(tmp_path):
     assert not any(f.endswith("A/1.png") for f in flagged)
 
 
+def test_default_threshold_is_cross_dataset_tight():
+    """Default must be the tight cross-dataset radius (10), not the dedup 22.
+
+    Across two photo datasets, distinct photos of the same static sign collide at
+    pHash distance ~16-26 from shared coarse structure; 22 would flood with false
+    positives. The default must stay tight so the guard flags real dups only.
+    """
+    assert ceo.CROSS_DATASET_PHASH_THRESHOLD == 10
+    assert ceo.CROSS_DATASET_PHASH_THRESHOLD < 22
+
+
+def test_same_sign_different_photo_not_flagged_at_default(tmp_path):
+    """Two DIFFERENT photos of the same sign must not be flagged at the default.
+
+    Simulated by two unrelated random images in the same class: their pHash
+    distance is large (~30+), far above the tight default, so 0 flagged.
+    """
+    rng = np.random.default_rng(7)
+    train = tmp_path / "train"
+    eval_ = tmp_path / "eval"
+    _save(eval_ / "A" / "0.png",
+          rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8))
+    _save(train / "A" / "0.png",
+          rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8))
+    report = ceo.check_overlap(train_dir=train, eval_dir=eval_)  # default thresh
+    assert report["threshold"] == ceo.CROSS_DATASET_PHASH_THRESHOLD
+    assert report["total_flagged"] == 0
+
+
 def test_no_overlap_reports_clean(tmp_path):
     rng = np.random.default_rng(1)
     train = tmp_path / "train"
