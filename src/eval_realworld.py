@@ -133,7 +133,9 @@ def _predict_image(
             image = cropped
     probs = _infer_probs(image, model, transform, device, tta=tta)
     pred = apply_decision_policy(
-        probs, class_thresholds=class_thresholds, class_names=class_names,
+        probs,
+        class_thresholds=class_thresholds,
+        class_names=class_names,
         margin=margin,
     )
     return pred, fell_back
@@ -228,9 +230,16 @@ def evaluate(
         for filepath, folder_idx in samples:
             true_idx = label_of[inv_folder[folder_idx]]
             pred_idx, fell_back = _predict_image(
-                filepath, model, transform, device, use_hand_crop, landmarker,
-                class_thresholds=class_thresholds, class_names=class_names,
-                margin=margin, tta=tta,
+                filepath,
+                model,
+                transform,
+                device,
+                use_hand_crop,
+                landmarker,
+                class_thresholds=class_thresholds,
+                class_names=class_names,
+                margin=margin,
+                tta=tta,
             )
             y_true.append(true_idx)
             y_pred.append(pred_idx)
@@ -278,8 +287,12 @@ def _subset_metrics(
     kept_labels = [i for i in range(len(class_names)) if i not in excluded_idx]
     kept_names = [class_names[i] for i in kept_labels]
     report = classification_report(
-        yt, yp, labels=kept_labels, target_names=kept_names,
-        zero_division=0, output_dict=True,
+        yt,
+        yp,
+        labels=kept_labels,
+        target_names=kept_names,
+        zero_division=0,
+        output_dict=True,
     )
     return {
         "accuracy": float((yt == yp).mean()),

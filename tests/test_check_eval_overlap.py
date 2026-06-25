@@ -30,8 +30,9 @@ def test_planted_duplicate_is_flagged_randoms_are_not(tmp_path):
     noise = rng.integers(-3, 4, size=base.shape)
     near = np.clip(base.astype(int) + noise, 0, 255).astype(np.uint8)
     _save(train / "A" / "0.png", near)  # should flag
-    _save(train / "A" / "1.png",
-          rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8))  # should not
+    _save(
+        train / "A" / "1.png", rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8)
+    )  # should not
 
     report = ceo.check_overlap(train_dir=train, eval_dir=eval_, threshold=22)
 
@@ -62,10 +63,8 @@ def test_same_sign_different_photo_not_flagged_at_default(tmp_path):
     rng = np.random.default_rng(7)
     train = tmp_path / "train"
     eval_ = tmp_path / "eval"
-    _save(eval_ / "A" / "0.png",
-          rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8))
-    _save(train / "A" / "0.png",
-          rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8))
+    _save(eval_ / "A" / "0.png", rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8))
+    _save(train / "A" / "0.png", rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8))
     report = ceo.check_overlap(train_dir=train, eval_dir=eval_)  # default thresh
     assert report["threshold"] == ceo.CROSS_DATASET_PHASH_THRESHOLD
     assert report["total_flagged"] == 0
@@ -75,10 +74,8 @@ def test_no_overlap_reports_clean(tmp_path):
     rng = np.random.default_rng(1)
     train = tmp_path / "train"
     eval_ = tmp_path / "eval"
-    _save(eval_ / "A" / "0.png",
-          rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8))
-    _save(train / "A" / "0.png",
-          rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8))
+    _save(eval_ / "A" / "0.png", rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8))
+    _save(train / "A" / "0.png", rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8))
 
     report = ceo.check_overlap(train_dir=train, eval_dir=eval_, threshold=22)
     assert report["total_flagged"] == 0
@@ -94,10 +91,8 @@ def test_only_same_class_compared(tmp_path):
     _save(eval_ / "A" / "0.png", base)
     _save(train / "B" / "0.png", base)  # same pixels, different class
     # Give A and B both folders in each root so the class intersection includes both.
-    _save(eval_ / "B" / "0.png",
-          rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8))
-    _save(train / "A" / "0.png",
-          rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8))
+    _save(eval_ / "B" / "0.png", rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8))
+    _save(train / "A" / "0.png", rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8))
 
     report = ceo.check_overlap(train_dir=train, eval_dir=eval_, threshold=22)
     # The identical pair is cross-class (train B vs eval A) → not compared → not flagged.

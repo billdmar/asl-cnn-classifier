@@ -74,7 +74,9 @@ def _val_split(data_dir: str, seed: int) -> tuple[list[tuple[str, int]], list[st
     return val, class_names
 
 
-def fit_thresholds(probs: np.ndarray, labels: np.ndarray, class_names: list[str]) -> dict:
+def fit_thresholds(
+    probs: np.ndarray, labels: np.ndarray, class_names: list[str]
+) -> dict:
     """Greedily pick a per-class acceptance threshold that maximizes macro-F1.
 
     Argmax (all-zero thresholds) is the baseline. For each class, sweep its
@@ -89,11 +91,16 @@ def fit_thresholds(probs: np.ndarray, labels: np.ndarray, class_names: list[str]
 
     def macro_f1(th: dict) -> float:
         preds = [
-            apply_decision_policy(probs[i], class_thresholds=th, class_names=class_names)
+            apply_decision_policy(
+                probs[i], class_thresholds=th, class_names=class_names
+            )
             for i in range(len(probs))
         ]
-        return float(f1_score(labels, preds, labels=list(range(n)),
-                              average="macro", zero_division=0))
+        return float(
+            f1_score(
+                labels, preds, labels=list(range(n)), average="macro", zero_division=0
+            )
+        )
 
     base = macro_f1(thresholds)
     best = base
@@ -115,7 +122,9 @@ def fit_thresholds(probs: np.ndarray, labels: np.ndarray, class_names: list[str]
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", required=True)
-    parser.add_argument("--data_dir", required=True, help="Training union (val split fit).")
+    parser.add_argument(
+        "--data_dir", required=True, help="Training union (val split fit)."
+    )
     parser.add_argument("--output", default="artifacts/decision_policy.json")
     parser.add_argument("--device", default="auto")
     parser.add_argument("--seed", type=int, default=42)
@@ -129,7 +138,9 @@ def main() -> int:
 
     val, class_names = _val_split(args.data_dir, args.seed)
     class_names = ckpt_class_names or class_names
-    ds = ASLDataset(samples=val, transform=get_eval_transforms(), class_names=class_names)
+    ds = ASLDataset(
+        samples=val, transform=get_eval_transforms(), class_names=class_names
+    )
     loader = DataLoader(ds, batch_size=64, shuffle=False)
 
     logits, labels = collect_logits(model, loader, device)
@@ -141,8 +152,10 @@ def main() -> int:
     save_json(args.output, result)
 
     print(f"Fit on VAL split of {args.data_dir} ({len(val)} samples)")
-    print(f"Macro-F1 (val): argmax {result['macro_f1_val_argmax']:.4f} "
-          f"-> policy {result['macro_f1_val_policy']:.4f}")
+    print(
+        f"Macro-F1 (val): argmax {result['macro_f1_val_argmax']:.4f} "
+        f"-> policy {result['macro_f1_val_policy']:.4f}"
+    )
     print(f"Per-class thresholds set: {result['class_thresholds']}")
     print(f"Saved decision policy to {args.output}")
     return 0

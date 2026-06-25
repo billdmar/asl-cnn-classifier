@@ -345,8 +345,13 @@ def test_build_metrics_includes_ay_fields():
     y_true = np.arange(26)
     y_pred = np.arange(26)
     m = erw._build_metrics(
-        y_true, y_pred, names, checkpoint="c", data_dir="d",
-        use_hand_crop=True, num_no_hand=0,
+        y_true,
+        y_pred,
+        names,
+        checkpoint="c",
+        data_dir="d",
+        use_hand_crop=True,
+        num_no_hand=0,
     )
     assert "accuracy_ay" in m and "macro_f1_ay" in m and "num_samples_ay" in m
     assert m["num_samples_ay"] == 24  # J and Z excluded

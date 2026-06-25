@@ -85,9 +85,7 @@ def check_overlap(
     """
     train_root = Path(train_dir)
     eval_root = Path(eval_dir)
-    classes = sorted(
-        set(get_class_names(train_root)) & set(get_class_names(eval_root))
-    )
+    classes = sorted(set(get_class_names(train_root)) & set(get_class_names(eval_root)))
 
     per_class: dict[str, dict[str, int]] = {}
     flagged_pairs: list[dict] = []
@@ -176,8 +174,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    print(f"Checking {args.train_dir} for near-duplicates of {args.eval_dir} "
-          f"(threshold={args.threshold})")
+    print(
+        f"Checking {args.train_dir} for near-duplicates of {args.eval_dir} "
+        f"(threshold={args.threshold})"
+    )
     report = check_overlap(
         train_dir=args.train_dir,
         eval_dir=args.eval_dir,
@@ -190,10 +190,13 @@ def main() -> int:
     print("\n=== Eval-overlap summary ===")
     print(f"Classes compared : {report['classes_compared']}")
     print(f"Train images     : {report['total_train_images']}")
-    print(f"Flagged near-dups: {report['total_flagged']} "
-          f"({report['flag_rate']:.2%})")
-    print(f"Distance histogram (min-dist -> count): "
-          f"{dict(list(report['distance_histogram'].items())[:12])}")
+    print(
+        f"Flagged near-dups: {report['total_flagged']} " f"({report['flag_rate']:.2%})"
+    )
+    print(
+        f"Distance histogram (min-dist -> count): "
+        f"{dict(list(report['distance_histogram'].items())[:12])}"
+    )
     if report["closest_pairs"]:
         print("Closest cross-set pairs (class, dist):")
         for p in report["closest_pairs"][:10]:
@@ -229,9 +232,7 @@ def _all_flagged_paths(
     """Re-scan and return ALL flagged training paths (not just the top-20 shown)."""
     train_root = Path(train_dir)
     eval_root = Path(eval_dir)
-    classes = sorted(
-        set(get_class_names(train_root)) & set(get_class_names(eval_root))
-    )
+    classes = sorted(set(get_class_names(train_root)) & set(get_class_names(eval_root)))
     flagged: list[str] = []
     for name in classes:
         train_imgs = _phash_dir(train_root / name)

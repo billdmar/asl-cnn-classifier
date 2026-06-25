@@ -10,17 +10,17 @@ interface BenchmarkMetric {
 const BENCHMARK_METRICS: ReadonlyArray<BenchmarkMetric> = [
   {
     label: "Held-out test accuracy",
-    value: "96.8%",
-    note: "26 classes A–Z, 1,631 test images",
+    value: "96.9%",
+    note: "26 classes A–Z, 3,170 test images (3-source merge)",
   },
   {
     label: "Macro F1",
-    value: "0.968",
+    value: "0.969",
     note: "averaged equally across all 26 classes",
   },
   {
     label: "Validation accuracy",
-    value: "97.8%",
+    value: "97.3%",
     note: "best epoch during fine-tuning",
   },
 ];
@@ -31,14 +31,11 @@ export function AccuracyStory() {
       <p>
         Two numbers, told honestly. The headline figures below are{" "}
         <strong className="text-fg">benchmark</strong> numbers, measured on the held-out
-        test split of the{" "}
-        <code className="rounded bg-bg-subtle px-1 py-0.5 text-sm">
-          Marxulia/asl_sign_languages_alphabets_v03
-        </code>{" "}
-        dataset (~10.9k images, 26 classes A–Z). They are real and reproducible with{" "}
+        test split of the deployed model&apos;s training union (Marxulia + aliciiavs +
+        Hemg, ~21k images, 26 classes A–Z). They are real and reproducible with{" "}
         <code className="rounded bg-bg-subtle px-1 py-0.5 text-sm">make eval-real</code> —
-        but they describe performance on a relatively uniform dataset, not the messy real
-        world.
+        but they describe performance on data that resembles the training set, not the messy
+        real world (see the honest cross-dataset number below).
       </p>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -115,7 +112,7 @@ export function AccuracyStory() {
           <p>
             Measured on the <strong className="text-fg">same</strong> held-out test split,
             the robust model scored <strong className="text-fg">92.3%</strong> versus the
-            baseline&apos;s 96.8% — heavy augmentation cost ~4.5 points on the benchmark.
+            then-baseline&apos;s ~97% — heavy augmentation cost ~4.5 points on the benchmark.
             Once we had a real cross-dataset test set, augmentation proved neutral there
             too: it was <strong className="text-fg">data diversity</strong>, not
             augmentation or architecture, that moved the honest number. The deployed model

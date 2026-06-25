@@ -136,9 +136,7 @@ class TransferModel(nn.Module):
             self.backbone.fc = nn.Linear(in_features, num_classes)
             self._head_param_ids = {id(p) for p in self.backbone.fc.parameters()}
         elif arch == "mobilenet_v3_small":
-            weights = (
-                MobileNet_V3_Small_Weights.IMAGENET1K_V1 if pretrained else None
-            )
+            weights = MobileNet_V3_Small_Weights.IMAGENET1K_V1 if pretrained else None
             self.backbone = models.mobilenet_v3_small(weights=weights)
             # Final classifier Linear is classifier[-1] (a small head MLP precedes it).
             in_features = self.backbone.classifier[-1].in_features

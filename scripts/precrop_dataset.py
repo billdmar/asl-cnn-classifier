@@ -225,11 +225,15 @@ def main() -> int:
     print("\n=== Pre-crop summary ===")
     print(f"Classes        : {report['num_classes']}")
     print(f"Total images   : {report['total_images']}")
-    print(f"No-hand images : {report['total_no_hand']} "
-          f"({report['global_no_hand_rate']:.1%})")
-    print(f"Sketches       : {report['total_sketches']} "
-          f"({report['global_sketch_rate']:.1%})"
-          f"{' (dropped)' if report['drop_sketches'] else ''}")
+    print(
+        f"No-hand images : {report['total_no_hand']} "
+        f"({report['global_no_hand_rate']:.1%})"
+    )
+    print(
+        f"Sketches       : {report['total_sketches']} "
+        f"({report['global_sketch_rate']:.1%})"
+        f"{' (dropped)' if report['drop_sketches'] else ''}"
+    )
     print(f"Written        : {report['total_written']}")
     print(f"Report         : {Path(report['out_dir']) / '_precrop_report.json'}")
     return 0
