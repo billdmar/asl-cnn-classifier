@@ -57,6 +57,23 @@ evidence; Hemg is training-only and EitanG98 remains the sole honest gate.
 static J/Z frames even nudged the motion signs off the floor: **J 0.143 → 0.170,
 Z 0.000 → 0.057**.
 
+## Phase 2 & 3 — at-source bias fix and architecture (both rejected)
+
+After D3 deployed, two further experiments were run and gated hard against it:
+
+| Experiment | Cross-dataset 26 | A–Y | Verdict |
+|------------|------------------|-----|---------|
+| D3 (deployed, MobileNetV2) | 55.5% | 59.8% | incumbent |
+| D4: + inverse-freq class-balanced loss | 55.1% | 59.2% | **REJECTED** (within noise; didn't fix the S sink — precision 0.34/recall 0.87 unchanged) |
+| mobilenet_v3_small (1.5M params) | 35.3% | 37.6% | **REJECTED** (−20 pts — underfits) |
+| efficientnet_b0 (4.0M params) | 54.5% | 58.7% | **REJECTED** (−1.0 pt; highest same-dataset val 97.5% yet *worse* cross-dataset — same-dataset val is the wrong signal) |
+
+Lessons: (1) the S over-prediction is feature-similarity (fist-like signs), not
+class frequency — class weighting can't fix it. (2) Architecture is not the lever
+here: a smaller backbone underfits, and a larger/newer one (efficientnet_b0)
+overfits the training domain *more* (best same-dataset val, worse cross-dataset).
+MobileNetV2 is well-matched. Both phases left the deployed D3 untouched.
+
 ## The trajectory
 
 ```
