@@ -1,0 +1,74 @@
+{
+  "ece": 0.024608061548866328,
+  "n_bins": 10,
+  "num_test_samples": 3170,
+  "mean_confidence": 0.9466487818221415,
+  "accuracy": 0.9690851735015773,
+  "bins": {
+    "bin_lowers": [
+      0.0,
+      0.1,
+      0.2,
+      0.30000000000000004,
+      0.4,
+      0.5,
+      0.6000000000000001,
+      0.7000000000000001,
+      0.8,
+      0.9
+    ],
+    "bin_uppers": [
+      0.1,
+      0.2,
+      0.30000000000000004,
+      0.4,
+      0.5,
+      0.6000000000000001,
+      0.7000000000000001,
+      0.8,
+      0.9,
+      1.0
+    ],
+    "bin_acc": [
+      0.0,
+      0.0,
+      0.0,
+      0.21052631578947367,
+      0.4473684210526316,
+      0.7090909090909091,
+      0.7945205479452054,
+      0.8977272727272727,
+      0.9312169312169312,
+      0.9970446989287034
+    ],
+    "bin_conf": [
+      0.0,
+      0.0,
+      0.22459540207771775,
+      0.35487620884924725,
+      0.45986456244299473,
+      0.5511232310363506,
+      0.6501469196003721,
+      0.7551318972418593,
+      0.8583344656771998,
+      0.9863262718230662
+    ],
+    "bin_count": [
+      0,
+      0,
+      1,
+      19,
+      38,
+      55,
+      73,
+      88,
+      189,
+      2707
+    ]
+  },
+  "checkpoint": "artifacts/checkpoints/best_model.pth",
+  "data_dir": "data/asl_real,data/asl_diverse,data/asl_hemg",
+  "temperature": 1.0,
+  "temperature_fit_on": "none",
+  "note": "ECE measured on the held-out test split of the real ASL dataset with the trained MobileNetV2 checkpoint \u2014 a meaningful calibration assessment. Compare 'mean_confidence' against 'accuracy' to read the direction of miscalibration; the reliability diagram shows where per-bin confidence and accuracy diverge."
+}

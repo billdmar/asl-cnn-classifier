@@ -1,0 +1,46 @@
+# Robustness retrain — MobileNetV2 with AGGRESSIVE domain augmentation, aimed at
+# closing the benchmark→real-world gap (cluttered webcam, varied lighting/skin
+# tone/background). Writes a SEPARATE checkpoint so the verified 96.8% baseline
+# (configs/train_real_mobilenet.yaml → artifacts/checkpoints/best_model.pth) is
+# never clobbered. Compare the two on the SAME held-out test split.
+#
+#   make train-robust && make eval-robust
+#
+# The heavy augmentation makes the training distribution look more webcam-like;
+# expect held-out benchmark accuracy to stay near (or slightly below) the
+# baseline while real-world robustness improves. Report both honestly.
+
+# Data
+data_dir: data/asl_real
+image_size: 128
+train_frac: 0.70
+val_frac: 0.15
+test_frac: 0.15
+
+# Model
+arch: mobilenet_v2
+num_classes: 26
+pretrained: true
+
+# Optimization
+batch_size: 64
+num_epochs: 14
+learning_rate: 0.001
+weight_decay: 0.0001
+optimizer: adamw
+lr_scheduler: cosine
+warmup_epochs: 3
+
+# Augmentation
+heavy_augmentation: true
+
+# Training behavior
+seed: 42
+num_workers: 4
+amp: false
+early_stopping_patience: 6
+device: auto
+
+# Output — SEPARATE checkpoint dir to protect the baseline.
+checkpoint_dir: artifacts/checkpoints_robust
+tensorboard_dir: artifacts/runs

@@ -1,0 +1,49 @@
+# Training configuration — DIVERSE MULTI-SOURCE fine-tune (Experiment D1).
+#
+# The deployed model overfits to single-signer/plain-background Marxulia data:
+# 96.8% same-dataset but only 33.4% cross-dataset. A prior 3-experiment effort
+# proved preprocessing (hand-crop, sketch-clean, augmentation) is tapped out —
+# all neutral. The remaining lever is more DIVERSE training data. This config
+# trains on the UNION of:
+#   - data/asl_real     (Marxulia, single signer, plain bg, A-Z — supplies J/Z)
+#   - data/asl_diverse  (aliciiavs, multiple signers/backgrounds, A-Y)
+# Download both first: `make download-real && make download-diverse`, then run
+# `make check-overlap` (MUST report ~0 contamination vs the eval set) before
+# training. Class names are the sorted union (A-Z, 26). Raw images (crop was
+# proven neutral — kept as a separate variable). Judged ONLY on cross-dataset
+# eval (`make eval-realworld-diverse`), never the inflated same-dataset benchmark.
+
+# Data — list form: train on the union of these class-folder datasets.
+data_dir:
+  - data/asl_real
+  - data/asl_diverse
+image_size: 128
+train_frac: 0.70
+val_frac: 0.15
+test_frac: 0.15
+
+# Model
+arch: mobilenet_v2
+num_classes: 26           # A-Z (union); J/Z come only from Marxulia, stay weak
+pretrained: true
+
+# Optimization (identical to the deployed recipe)
+batch_size: 64
+num_epochs: 12
+learning_rate: 0.001
+weight_decay: 0.0001
+optimizer: adamw
+lr_scheduler: cosine
+warmup_epochs: 3
+
+# Training behavior
+seed: 42
+num_workers: 4
+amp: false
+early_stopping_patience: 5
+device: auto
+augmentation: standard
+
+# Output — SEPARATE dir; never clobber the deployed artifacts/checkpoints.
+checkpoint_dir: artifacts/checkpoints_diverse
+tensorboard_dir: artifacts/runs

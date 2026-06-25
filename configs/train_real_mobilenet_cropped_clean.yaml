@@ -1,0 +1,43 @@
+# Training configuration — CROP-CONSISTENT + SKETCH-FILTERED (Experiment A-clean).
+#
+# Same as configs/train_real_mobilenet_cropped.yaml, but trained on
+# data/asl_real_cropped_clean — the hand-cropped set with the ~15% non-photographic
+# pencil-sketch line drawings REMOVED (built by `make precrop-clean`). Investigation
+# found the Marxulia training set is 15.1% sketch diagrams (63/class, all of which
+# fail hand detection), which polluted the first crop-consistent run (Experiment A
+# came out neutral). This run gives crop-consistency a fair test on photo-only data.
+#
+# Standard augmentation. SEPARATE checkpoint dir protects the baseline + prior runs.
+
+# Data
+data_dir: data/asl_real_cropped_clean
+image_size: 128
+train_frac: 0.70
+val_frac: 0.15
+test_frac: 0.15
+
+# Model
+arch: mobilenet_v2
+num_classes: 26           # A-Z (this dataset has no del/nothing/space)
+pretrained: true
+
+# Optimization
+batch_size: 64
+num_epochs: 12
+learning_rate: 0.001      # head LR during warm-up
+weight_decay: 0.0001
+optimizer: adamw
+lr_scheduler: cosine
+warmup_epochs: 3          # epochs with frozen backbone before fine-tuning
+
+# Training behavior
+seed: 42
+num_workers: 4
+amp: false                # auto-disabled on non-CUDA devices
+early_stopping_patience: 5
+device: auto
+augmentation: standard
+
+# Output — SEPARATE dir; never clobber the deployed artifacts/checkpoints.
+checkpoint_dir: artifacts/checkpoints_cropped_clean
+tensorboard_dir: artifacts/runs

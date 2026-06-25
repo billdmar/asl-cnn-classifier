@@ -27,6 +27,7 @@ import argparse
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import torch
 import yaml
 from torch import nn
@@ -36,9 +37,11 @@ from torchvision import utils as tv_utils
 
 from src.dataset import (
     ASLDataset,
+    _list_samples,
     get_class_names,
     get_eval_transforms,
     get_train_transforms,
+    get_union_class_names,
     make_stratified_splits,
 )
 from src.model import TransferModel, build_model
@@ -124,6 +127,20 @@ def load_config(args: argparse.Namespace) -> dict[str, Any]:
     config.setdefault("tensorboard_dir", "artifacts/runs")
     config.setdefault("resume_checkpoint", None)
     return config
+
+
+def _normalize_data_dirs(data_dir: Any) -> list[str]:
+    """Normalize the ``data_dir`` config value to a list of directory strings.
+
+    Accepts a single path string, a YAML list of paths, or a comma-separated
+    string (the CLI ``--data_dir "a,b"`` override form). A single dir yields a
+    one-element list so the caller's single-source path stays unchanged.
+    """
+    if isinstance(data_dir, (list, tuple)):
+        dirs = [str(d).strip() for d in data_dir]
+    else:
+        dirs = [part.strip() for part in str(data_dir).split(",")]
+    return [d for d in dirs if d]
 
 
 def build_optimizer(
@@ -236,21 +253,51 @@ def main() -> None:
     scaler = torch.amp.GradScaler(enabled=use_amp)
 
     # --- Data ---
-    data_dir = config["data_dir"]
-    class_names = get_class_names(data_dir)
-    train_samples, val_samples, _test_samples = make_stratified_splits(
-        data_dir,
-        train_frac=config["train_frac"],
-        val_frac=config["val_frac"],
-        test_frac=config["test_frac"],
-        seed=int(config["seed"]),
-        class_names=class_names,
-    )
+    # `data_dir` may be a single dir (str) or several (list, or comma-separated
+    # str via CLI override). Multiple dirs train on the UNION of class-folder
+    # datasets for diversity; class_names is the sorted union so the label↔index
+    # map covers every class present in any source. The single-dir path is
+    # unchanged (byte-identical split).
+    data_dirs = _normalize_data_dirs(config["data_dir"])
+    if len(data_dirs) == 1:
+        class_names = get_class_names(data_dirs[0])
+        train_samples, val_samples, _test_samples = make_stratified_splits(
+            data_dirs[0],
+            train_frac=config["train_frac"],
+            val_frac=config["val_frac"],
+            test_frac=config["test_frac"],
+            seed=int(config["seed"]),
+            class_names=class_names,
+        )
+    else:
+        class_names = get_union_class_names(data_dirs)
+        merged_samples: list[tuple[str, int]] = []
+        for d in data_dirs:
+            merged_samples.extend(_list_samples(d, class_names))
+        print(
+            f"Multi-source training on {len(data_dirs)} dirs "
+            f"({len(merged_samples)} images, {len(class_names)} classes): "
+            f"{', '.join(str(d) for d in data_dirs)}"
+        )
+        train_samples, val_samples, _test_samples = make_stratified_splits(
+            samples=merged_samples,
+            train_frac=config["train_frac"],
+            val_frac=config["val_frac"],
+            test_frac=config["test_frac"],
+            seed=int(config["seed"]),
+            class_names=class_names,
+        )
 
     image_size = int(config["image_size"])
+    # Augmentation regime: prefer the explicit `augmentation` config key; fall
+    # back to the legacy boolean `heavy_augmentation` so existing configs behave
+    # identically. `get_train_transforms` resolves None → standard/heavy.
+    aug_regime = config.get("augmentation")
+    if aug_regime is None and bool(config.get("heavy_augmentation", False)):
+        aug_regime = "heavy"
     train_ds = ASLDataset(
         samples=train_samples,
-        transform=get_train_transforms(image_size),
+        transform=get_train_transforms(image_size, regime=aug_regime),
         class_names=class_names,
     )
     val_ds = ASLDataset(
@@ -311,7 +358,22 @@ def main() -> None:
 
     base_lr = float(config["learning_rate"])
     num_epochs = int(config["num_epochs"])
-    criterion = nn.CrossEntropyLoss()
+    # Optional inverse-frequency class weighting to counter source/class
+    # imbalance (e.g. an over-predicted "sink" class). Off by default →
+    # plain CrossEntropyLoss, byte-identical to before.
+    class_weight = None
+    if str(config.get("class_weights", "")).lower() == "auto":
+        counts = np.bincount(
+            [lbl for _f, lbl in train_samples], minlength=len(class_names)
+        ).astype(np.float64)
+        # inverse frequency, normalized to mean 1 so the loss scale is unchanged
+        inv = np.where(counts > 0, counts.sum() / (counts * len(counts)), 0.0)
+        inv = inv / inv[inv > 0].mean() if (inv > 0).any() else inv
+        class_weight = torch.tensor(inv, dtype=torch.float32, device=device)
+        print(
+            f"Class-weighted loss (inverse-frequency) enabled: {class_weight.tolist()}"
+        )
+    criterion = nn.CrossEntropyLoss(weight=class_weight)
     optimizer = build_optimizer(model, config, base_lr)
     scheduler = build_scheduler(optimizer, config, t_max=num_epochs)
     is_plateau = isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
@@ -438,8 +500,14 @@ def main() -> None:
     print(f"Best validation accuracy: {best_val_acc:.4f}")
     print(f"Best checkpoint saved to: {best_path}")
 
-    save_json("artifacts/training_history.json", history)
-    print("Training history written to artifacts/training_history.json")
+    # Write history alongside the checkpoint so separate runs (e.g. a robustness
+    # retrain to a different checkpoint_dir) don't clobber each other's history.
+    # Also mirror to the canonical artifacts path for the default run.
+    history_path = checkpoint_dir / "training_history.json"
+    save_json(str(history_path), history)
+    print(f"Training history written to {history_path}")
+    if checkpoint_dir == Path("artifacts/checkpoints"):
+        save_json("artifacts/training_history.json", history)
 
 
 if __name__ == "__main__":

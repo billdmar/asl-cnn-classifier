@@ -168,6 +168,61 @@ def test_main_custom_cnn_end_to_end(tmp_path, monkeypatch, capsys):
     assert (tmp_path / "checkpoints" / "best_model.pth").exists()
 
 
+def test_main_multi_dir_merge_end_to_end(tmp_path, monkeypatch, capsys):
+    """Comma-separated data_dir trains on the merged union and saves a checkpoint."""
+    import numpy as np
+    from PIL import Image
+
+    # Build two tiny source dirs with overlapping + distinct classes.
+    rng = np.random.default_rng(0)
+
+    def _make(root, classes):
+        for cls in classes:
+            d = tmp_path / root / cls
+            d.mkdir(parents=True)
+            for i in range(8):
+                arr = rng.integers(0, 256, size=(32, 32, 3), dtype=np.uint8)
+                Image.fromarray(arr).save(d / f"{i:03d}.png")
+
+    _make("srcA", ["A", "B"])
+    _make("srcB", ["B", "C"])  # union = A, B, C
+
+    cfg_path = _write_config(tmp_path, num_classes=3)
+    merged = f"{tmp_path / 'srcA'},{tmp_path / 'srcB'}"
+    monkeypatch.setattr(
+        argparse.ArgumentParser,
+        "parse_args",
+        lambda self: argparse.Namespace(
+            config=str(cfg_path),
+            data_dir=merged,
+            arch=None,
+            num_epochs=None,
+            batch_size=None,
+            learning_rate=None,
+            seed=None,
+            amp=None,
+            device="cpu",
+            resume_checkpoint=None,
+        ),
+    )
+    train.main()
+    out = capsys.readouterr().out
+    assert "Multi-source training on 2 dirs" in out
+
+    ckpt = torch.load(
+        tmp_path / "checkpoints" / "best_model.pth",
+        map_location="cpu",
+        weights_only=False,
+    )
+    assert ckpt["class_names"] == ["A", "B", "C"]
+
+
+def test_normalize_data_dirs_forms():
+    assert train._normalize_data_dirs("data/x") == ["data/x"]
+    assert train._normalize_data_dirs("a, b") == ["a", "b"]
+    assert train._normalize_data_dirs(["a", "b"]) == ["a", "b"]
+
+
 def test_main_transfer_with_warmup_and_resume(tmp_path, monkeypatch, capsys):
     """Covers the freeze->unfreeze warmup path and resume_checkpoint loading."""
     import os
