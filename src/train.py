@@ -36,9 +36,11 @@ from torchvision import utils as tv_utils
 
 from src.dataset import (
     ASLDataset,
+    _list_samples,
     get_class_names,
     get_eval_transforms,
     get_train_transforms,
+    get_union_class_names,
     make_stratified_splits,
 )
 from src.model import TransferModel, build_model
@@ -124,6 +126,20 @@ def load_config(args: argparse.Namespace) -> dict[str, Any]:
     config.setdefault("tensorboard_dir", "artifacts/runs")
     config.setdefault("resume_checkpoint", None)
     return config
+
+
+def _normalize_data_dirs(data_dir: Any) -> list[str]:
+    """Normalize the ``data_dir`` config value to a list of directory strings.
+
+    Accepts a single path string, a YAML list of paths, or a comma-separated
+    string (the CLI ``--data_dir "a,b"`` override form). A single dir yields a
+    one-element list so the caller's single-source path stays unchanged.
+    """
+    if isinstance(data_dir, (list, tuple)):
+        dirs = [str(d).strip() for d in data_dir]
+    else:
+        dirs = [part.strip() for part in str(data_dir).split(",")]
+    return [d for d in dirs if d]
 
 
 def build_optimizer(
@@ -236,16 +252,40 @@ def main() -> None:
     scaler = torch.amp.GradScaler(enabled=use_amp)
 
     # --- Data ---
-    data_dir = config["data_dir"]
-    class_names = get_class_names(data_dir)
-    train_samples, val_samples, _test_samples = make_stratified_splits(
-        data_dir,
-        train_frac=config["train_frac"],
-        val_frac=config["val_frac"],
-        test_frac=config["test_frac"],
-        seed=int(config["seed"]),
-        class_names=class_names,
-    )
+    # `data_dir` may be a single dir (str) or several (list, or comma-separated
+    # str via CLI override). Multiple dirs train on the UNION of class-folder
+    # datasets for diversity; class_names is the sorted union so the label↔index
+    # map covers every class present in any source. The single-dir path is
+    # unchanged (byte-identical split).
+    data_dirs = _normalize_data_dirs(config["data_dir"])
+    if len(data_dirs) == 1:
+        class_names = get_class_names(data_dirs[0])
+        train_samples, val_samples, _test_samples = make_stratified_splits(
+            data_dirs[0],
+            train_frac=config["train_frac"],
+            val_frac=config["val_frac"],
+            test_frac=config["test_frac"],
+            seed=int(config["seed"]),
+            class_names=class_names,
+        )
+    else:
+        class_names = get_union_class_names(data_dirs)
+        merged_samples: list[tuple[str, int]] = []
+        for d in data_dirs:
+            merged_samples.extend(_list_samples(d, class_names))
+        print(
+            f"Multi-source training on {len(data_dirs)} dirs "
+            f"({len(merged_samples)} images, {len(class_names)} classes): "
+            f"{', '.join(str(d) for d in data_dirs)}"
+        )
+        train_samples, val_samples, _test_samples = make_stratified_splits(
+            samples=merged_samples,
+            train_frac=config["train_frac"],
+            val_frac=config["val_frac"],
+            test_frac=config["test_frac"],
+            seed=int(config["seed"]),
+            class_names=class_names,
+        )
 
     image_size = int(config["image_size"])
     # Augmentation regime: prefer the explicit `augmentation` config key; fall

@@ -158,3 +158,71 @@ def test_dedup_clustering_invariant_to_input_order(tmp_path):
         return {frozenset(v) for v in members.values()}
 
     assert partition(samples, base_ids) == partition(shuffled, shuf_ids)
+
+
+# --- Multi-source merge (diverse training) ----------------------------------
+
+
+def _make_class_dataset(root, classes, n_per_class=6):
+    """Write n tiny random RGB PNGs per class under root/<CLASS>/."""
+    rng = np.random.default_rng(0)
+    for cls in classes:
+        cdir = root / cls
+        cdir.mkdir(parents=True)
+        for i in range(n_per_class):
+            arr = rng.integers(0, 256, size=(32, 32, 3), dtype=np.uint8)
+            Image.fromarray(arr).save(cdir / f"{i:03d}.png")
+
+
+def test_make_splits_samples_param_matches_root_dir():
+    """samples= must produce the byte-identical split to the root_dir path."""
+    names = dataset.get_class_names(_repo_path(DATA_DIR))
+    samples = dataset._list_samples(_repo_path(DATA_DIR), names)
+
+    from_root = make_stratified_splits(_repo_path(DATA_DIR), class_names=names)
+    from_samples = make_stratified_splits(samples=samples, class_names=names)
+    assert from_root == from_samples
+
+
+def test_make_splits_requires_root_or_samples():
+    with pytest.raises(ValueError):
+        make_stratified_splits()  # neither root_dir nor samples
+
+
+def test_get_union_class_names_unions_across_dirs(tmp_path):
+    """A-Z dir unioned with A-Y dir yields the full sorted A-Z (incl. J, Z)."""
+    az = tmp_path / "az"
+    ay = tmp_path / "ay"
+    _make_class_dataset(az, [chr(c) for c in range(ord("A"), ord("Z") + 1)])
+    _make_class_dataset(ay, [c for c in
+                             (chr(x) for x in range(ord("A"), ord("Z") + 1))
+                             if c not in ("J", "Z")])
+    union = dataset.get_union_class_names([az, ay])
+    assert union == [chr(c) for c in range(ord("A"), ord("Z") + 1)]
+    assert "J" in union and "Z" in union
+
+
+def test_merged_two_dir_split_no_leak_both_sources(tmp_path):
+    """Merging two dirs: union classes, no file leak, both sources represented."""
+    d1 = tmp_path / "src1"
+    d2 = tmp_path / "src2"
+    _make_class_dataset(d1, ["A", "B"], n_per_class=10)
+    _make_class_dataset(d2, ["B", "C"], n_per_class=10)  # overlapping + new class
+
+    class_names = dataset.get_union_class_names([d1, d2])
+    assert class_names == ["A", "B", "C"]
+
+    merged = dataset._list_samples(d1, class_names) + dataset._list_samples(
+        d2, class_names
+    )
+    train, val, test = make_stratified_splits(
+        samples=merged, class_names=class_names, seed=42
+    )
+
+    all_files = [f for split in (train, val, test) for f, _ in split]
+    assert len(all_files) == len(set(all_files))  # no file in two splits
+    assert len(all_files) == len(merged)  # every file placed once
+    # Both source dirs contribute to the training split.
+    train_files = [f for f, _ in train]
+    assert any("src1" in f for f in train_files)
+    assert any("src2" in f for f in train_files)

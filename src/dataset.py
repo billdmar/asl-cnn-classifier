@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from collections.abc import Sequence
 from pathlib import Path
 
 import torch
@@ -164,6 +165,24 @@ def get_class_names(root_dir: str | Path | None = None) -> list[str]:
         if found:
             return found
     return list(CLASS_NAMES)
+
+
+def get_union_class_names(root_dirs: Sequence[str | Path]) -> list[str]:
+    """Return the sorted union of class-folder names across several dataset dirs.
+
+    Used for multi-source (merged-dataset) training: the label↔index map must
+    cover every class present in *any* source. E.g. merging a 26-class A–Z set
+    with a 24-class A–Y set yields the full A–Z (the first set supplies J/Z);
+    :func:`_list_samples` simply contributes zero samples for a class a given dir
+    lacks, so there is no label drift. Falls back to the canonical
+    :data:`CLASS_NAMES` if no class folders are found in any dir.
+    """
+    found: set[str] = set()
+    for d in root_dirs:
+        p = Path(d)
+        if p.is_dir():
+            found.update(child.name for child in p.iterdir() if child.is_dir())
+    return sorted(found) if found else list(CLASS_NAMES)
 
 
 def _list_samples(
@@ -330,7 +349,7 @@ def _phash_groups(
 
 
 def make_stratified_splits(
-    root_dir: str | Path,
+    root_dir: str | Path | None = None,
     train_frac: float = 0.70,
     val_frac: float = 0.15,
     test_frac: float = 0.15,
@@ -338,6 +357,7 @@ def make_stratified_splits(
     class_names: list[str] | None = None,
     dedup: bool = False,
     dedup_threshold: int = DEDUP_PHASH_THRESHOLD,
+    samples: list[tuple[str, int]] | None = None,
 ) -> tuple[list[tuple[str, int]], list[tuple[str, int]], list[tuple[str, int]]]:
     """Split dataset files into train/val/test, stratified by class label.
 
@@ -355,18 +375,28 @@ def make_stratified_splits(
     train/test. This lowers the headline number but makes it trustworthy.
 
     Args:
+        root_dir: A single class-folder dataset root. Ignored when ``samples`` is
+            given. Required (with ``samples=None``) for the original behavior.
         dedup: When ``True``, cluster near-duplicate frames (perceptual hash) and
             keep every cluster wholly within one split (group-aware split). When
             ``False`` (default) the behavior is the original file-level random
             split — byte-identical to before, so existing repro is unchanged.
         dedup_threshold: pHash Hamming distance under which two frames are
             near-duplicates. Only used when ``dedup=True``.
+        samples: A pre-computed ``(filepath, label)`` list to split directly,
+            bypassing ``root_dir``/``_list_samples``. Used for multi-source
+            (merged-dataset) training where samples come from several dirs. When
+            ``None`` (default) samples are listed from ``root_dir`` exactly as
+            before — so the single-source path is unchanged.
     """
     if abs(train_frac + val_frac + test_frac - 1.0) > 1e-6:
         raise ValueError("train/val/test fractions must sum to 1.0")
 
-    class_names = class_names or get_class_names(root_dir)
-    samples = _list_samples(root_dir, class_names)
+    if samples is None:
+        if root_dir is None:
+            raise ValueError("Provide either root_dir or samples.")
+        class_names = class_names or get_class_names(root_dir)
+        samples = _list_samples(root_dir, class_names)
     if not samples:
         raise RuntimeError(f"No images found under {root_dir}")
 

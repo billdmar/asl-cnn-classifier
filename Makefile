@@ -3,7 +3,7 @@
 
 PY := .venv/bin/python
 
-.PHONY: install download-real download-crossval sample-train train train-real eval eval-real eval-realworld precrop precrop-clean train-cropped train-cropped-midaug train-cropped-clean eval-realworld-cropped eval-realworld-cropped-midaug eval-realworld-cropped-clean gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
+.PHONY: install download-real download-crossval download-diverse download-hemg sample-train train train-real eval eval-real eval-realworld precrop precrop-clean train-cropped train-cropped-midaug train-cropped-clean eval-realworld-cropped eval-realworld-cropped-midaug eval-realworld-cropped-clean check-overlap train-diverse eval-realworld-diverse gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
 
 # Target Hugging Face Space, e.g. `export HF_SPACE=you/asl-cnn-classifier`.
 HF_SPACE ?=
@@ -24,6 +24,16 @@ download-real:
 # 30/class, for the honest cross-dataset generalization measurement.
 download-crossval:
 	$(PY) -m src.download_hf_data --dataset asl_letters --out_dir data/asl_crossval --max_per_class 30
+
+# Download a genuinely DIVERSE 2nd TRAINING source (aliciiavs: multiple signers,
+# real varied backgrounds, A–Y) into data/asl_diverse/ — the antidote to
+# Marxulia's single-signer overfit. Run `make check-overlap` after this.
+download-diverse:
+	$(PY) -m src.download_hf_data --dataset diverse --out_dir data/asl_diverse
+
+# Fallback diversity source (Hemg: balanced, includes J/Z, dark cropped-hand bg).
+download-hemg:
+	$(PY) -m src.download_hf_data --dataset hemg --out_dir data/asl_hemg
 
 # Quick end-to-end smoke train on the tiny committed sample set (CPU, 2 epochs).
 sample-train:
@@ -99,6 +109,22 @@ eval-realworld-cropped-midaug:
 # Gate Experiment A-clean on the cross-dataset set (distinct artifact).
 eval-realworld-cropped-clean:
 	$(PY) -m src.eval_realworld --checkpoint artifacts/checkpoints_cropped_clean/best_model.pth --data_dir data/asl_crossval --output artifacts/realworld_eval_cropped_clean.json
+
+# --- Diverse multi-source training (the data-domain lever) --------------------
+# GUARD: scan the diverse training set for near-duplicates of the held-out eval
+# set. MUST report ~0 contamination before training, or the gate is poisoned.
+check-overlap:
+	$(PY) scripts/check_eval_overlap.py --train_dir data/asl_diverse --eval_dir data/asl_crossval
+
+# Experiment D1: train on the UNION of Marxulia + aliciiavs → SEPARATE checkpoint
+# (artifacts/checkpoints_diverse/). Run download-real, download-diverse, and
+# check-overlap first.
+train-diverse:
+	$(PY) -m src.train --config configs/train_real_mobilenet_diverse.yaml
+
+# Gate D1 on the cross-dataset set (distinct artifact).
+eval-realworld-diverse:
+	$(PY) -m src.eval_realworld --checkpoint artifacts/checkpoints_diverse/best_model.pth --data_dir data/asl_crossval --output artifacts/realworld_eval_diverse.json
 
 # Grad-CAM explainability overlay for a single image (uses sample data here).
 gradcam:
