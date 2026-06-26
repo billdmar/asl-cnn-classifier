@@ -13,13 +13,31 @@ detects Next.js in `web/package.json` and builds natively — no `vercel.json` a
 no `cd web` indirection. A repo-root `.vercelignore` keeps the dataset, venv, and
 caches out of the upload.
 
-### Option A — Vercel dashboard (recommended, auto-deploys on push)
+### Option A — Vercel dashboard Git integration (auto-deploy on push)
 
 1. Go to <https://vercel.com/new> and import `billdmar/asl-cnn-classifier`.
 2. Set **Root Directory** to `web` (Settings → General → Root Directory). Vercel
    then auto-detects the **Next.js** preset.
-3. Deploy. Every push to `main` then auto-deploys; pushes to other branches get
-   preview URLs.
+3. With the Git integration connected, every push to `main` auto-deploys and other
+   branches get preview URLs.
+
+> **Note:** the repo is linked to the Vercel project via the CLI
+> (`.vercel/project.json`), but the **dashboard Git integration is not connected**,
+> so pushes do NOT auto-deploy today. Use Option B (manual) or Option C (CI action).
+
+### Option C — GitHub Action (`.github/workflows/deploy.yml`)
+
+A workflow deploys to production on push to `main`, **inert until you add three repo
+secrets** (Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+|---|---|
+| `VERCEL_TOKEN` | a token from <https://vercel.com/account/tokens> |
+| `VERCEL_ORG_ID` | `team_6xaQFg6rP37GuNDynoQPVfyc` |
+| `VERCEL_PROJECT_ID` | `prj_c8EyEmscWD8eIVJSqW1J7MqcrQy5` |
+
+Without `VERCEL_TOKEN` the job logs a notice and skips (no failure). Once set,
+merges to `main` deploy automatically.
 
 ### Option B — Vercel CLI (manual)
 
