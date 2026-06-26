@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AccuracyTrajectory } from "@/components/story/accuracy-trajectory";
 
 interface BenchmarkMetric {
   label: string;
@@ -89,6 +90,9 @@ export function AccuracyStory() {
             help — documented as honest negatives in the repo&apos;s{" "}
             <code className="rounded bg-bg-subtle px-1 py-0.5 text-sm">docs/</code>.
           </p>
+          <div className="mt-4">
+            <AccuracyTrajectory />
+          </div>
         </CardContent>
       </Card>
 

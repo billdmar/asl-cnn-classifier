@@ -12,7 +12,7 @@ const config: Config = {
           card: "#13131c",
         },
         border: { DEFAULT: "#23232f", subtle: "#1a1a24" },
-        fg: { DEFAULT: "#f5f5fa", muted: "#a0a0b0", subtle: "#6a6a7a" },
+        fg: { DEFAULT: "#f5f5fa", muted: "#a0a0b0", subtle: "#828292" },
         accent: {
           DEFAULT: "#7c5cff",
           from: "#7c5cff",

@@ -118,6 +118,7 @@ export function configureRuntime(): void {
  */
 export function getSession(
   modelUrl: string = DEFAULT_MODEL_URL,
+  onProgress?: (fraction: number) => void,
 ): Promise<ort.InferenceSession> {
   if (!sessionPromise) {
     configureRuntime();
@@ -126,9 +127,59 @@ export function getSession(
       typeof navigator !== "undefined" && "gpu" in navigator
         ? ["webgpu", "wasm"]
         : ["wasm"];
-    sessionPromise = ort.InferenceSession.create(modelUrl, { executionProviders });
+    sessionPromise = (async () => {
+      // When a progress callback is given, stream the ~9 MB model ourselves so we
+      // can report download progress (ort.InferenceSession.create fetches the URL
+      // internally with no progress hook). Fall back to the URL form otherwise,
+      // or if streaming/Content-Length isn't available.
+      if (onProgress) {
+        const bytes = await fetchWithProgress(modelUrl, onProgress);
+        if (bytes) {
+          return ort.InferenceSession.create(bytes, { executionProviders });
+        }
+      }
+      return ort.InferenceSession.create(modelUrl, { executionProviders });
+    })();
   }
   return sessionPromise;
+}
+
+/**
+ * Fetch a binary asset while reporting download progress (0–1). Returns the
+ * bytes, or null if the stream/Content-Length isn't usable (caller then falls
+ * back to a plain URL load). Reports 1.0 on completion regardless.
+ */
+async function fetchWithProgress(
+  url: string,
+  onProgress: (fraction: number) => void,
+): Promise<Uint8Array | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok || !res.body) return null;
+    const total = Number(res.headers.get("Content-Length") ?? 0);
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        chunks.push(value);
+        received += value.length;
+        if (total > 0) onProgress(Math.min(1, received / total));
+      }
+    }
+    onProgress(1);
+    const out = new Uint8Array(received);
+    let offset = 0;
+    for (const c of chunks) {
+      out.set(c, offset);
+      offset += c.length;
+    }
+    return out;
+  } catch {
+    return null;
+  }
 }
 
 /** Reset the cached session and temperature (used by tests). */

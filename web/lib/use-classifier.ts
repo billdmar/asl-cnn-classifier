@@ -25,6 +25,8 @@ export interface UseClassifier {
   status: WarmupStatus;
   /** Human-readable error message when {@link status} is `"error"`. */
   error: string | null;
+  /** Model-download progress in [0, 1] during `"warming"` (0 until bytes arrive). */
+  progress: number;
   /** Kick off (or re-try) preloading the model + landmarker. Idempotent. */
   warmUp: () => void;
   /** Run end-to-end classification on a canvas-drawable source. */
@@ -40,6 +42,7 @@ export interface UseClassifier {
 export function useClassifier(autoWarm = false): UseClassifier {
   const [status, setStatus] = useState<WarmupStatus>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
   // Guard against double warm-up (React 18/19 strict-mode double effects).
   const startedRef = useRef(false);
 
@@ -48,7 +51,8 @@ export function useClassifier(autoWarm = false): UseClassifier {
     startedRef.current = true;
     setStatus("warming");
     setError(null);
-    void Promise.all([getSession(), getHandLandmarker()])
+    setProgress(0);
+    void Promise.all([getSession(undefined, setProgress), getHandLandmarker()])
       .then(() => {
         setStatus("ready");
       })
@@ -68,5 +72,5 @@ export function useClassifier(autoWarm = false): UseClassifier {
     if (autoWarm) warmUp();
   }, [autoWarm, warmUp]);
 
-  return { status, error, warmUp, classify };
+  return { status, error, progress, warmUp, classify };
 }

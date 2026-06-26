@@ -1,0 +1,49 @@
+name: Deploy (Vercel production)
+
+# Auto-deploys the web app to Vercel production on every push to main.
+#
+# INERT UNTIL SECRETS ARE SET. This workflow no-ops unless three GitHub repo
+# secrets exist (Settings → Secrets and variables → Actions):
+#   VERCEL_TOKEN        — a Vercel access token (vercel.com/account/tokens)
+#   VERCEL_ORG_ID       — team_6xaQFg6rP37GuNDynoQPVfyc
+#   VERCEL_PROJECT_ID   — prj_c8EyEmscWD8eIVJSqW1J7MqcrQy5
+# Until then, deploy manually with `vercel --prod` (see docs/DEPLOY.md). The
+# project's root directory is `web` (configured in Vercel project settings).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Skip entirely if the deploy token isn't configured (keeps the workflow inert).
+    if: ${{ github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Check for Vercel token
+        id: gate
+        run: |
+          if [ -n "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::VERCEL_TOKEN not set — skipping deploy. Deploy manually with 'vercel --prod' (see docs/DEPLOY.md)."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.enabled == 'true'
+
+      - name: Install Vercel CLI
+        if: steps.gate.outputs.enabled == 'true'
+        run: npm install -g vercel@latest
+
+      - name: Pull Vercel env, build, and deploy (production)
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+          vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+          vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}"

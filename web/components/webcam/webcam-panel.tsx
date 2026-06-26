@@ -33,6 +33,13 @@ import {
   SMOOTHING_WINDOW,
   type ConfidencePoint,
 } from "@/components/webcam/smoothing";
+import {
+  advanceHold,
+  appendLetter,
+  backspace,
+  INITIAL_HOLD,
+  type HoldState,
+} from "@/components/webcam/word-builder";
 import { interpret, type ConfidenceVerdict } from "@/lib/confidence";
 import { cropBoxFromLandmarks, cropToCanvas, type CropBox } from "@/lib/handcrop";
 import { CLASS_NAMES } from "@/lib/labels";
@@ -59,7 +66,13 @@ const HAND_LOST_RESET_MS = 600;
 
 export function WebcamPanel() {
   const reduceMotion = useReducedMotion();
-  const { status: warmStatus, error: warmError, warmUp, classify } = useClassifier();
+  const {
+    status: warmStatus,
+    error: warmError,
+    progress: warmProgress,
+    warmUp,
+    classify,
+  } = useClassifier();
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -87,6 +100,10 @@ export function WebcamPanel() {
   /** Capped history of the smoothed top-1 confidence for the live sparkline. */
   const [confHistory, setConfHistory] = useState<ConfidencePoint[]>([]);
   const confFrameRef = useRef(0);
+  /** Fingerspelling word-builder: the running word, hold state, and hold progress. */
+  const [word, setWord] = useState("");
+  const [holdProgress, setHoldProgress] = useState(0);
+  const holdRef = useRef<HoldState>(INITIAL_HOLD);
   const [captureLetter, setCaptureLetter] = useState("A");
   const [captureCount, setCaptureCount] = useState(0);
 
@@ -153,6 +170,9 @@ export function WebcamPanel() {
           setResult(null);
           setVerdict(null);
           setConfHistory([]);
+          // Reset the in-progress hold (the built word is intentionally kept).
+          holdRef.current = INITIAL_HOLD;
+          setHoldProgress(0);
         }
 
         // Throttle the expensive classify step; skip if one is in flight.
@@ -192,6 +212,18 @@ export function WebcamPanel() {
                   CONFIDENCE_HISTORY_CAP,
                 ),
               );
+              // Word-builder: advance the hold on the smoothed top letter; a
+              // confident letter held HOLD_MS locks one letter into the word.
+              const v = interpret(smoothed);
+              const hold = advanceHold(
+                holdRef.current,
+                v.top.label,
+                !v.unsure,
+                now,
+              );
+              holdRef.current = hold.state;
+              setHoldProgress(hold.progress);
+              if (hold.locked) setWord((w) => appendLetter(w, hold.locked!));
             })
             .catch(() => {
               /* transient inference error — keep the loop alive */
@@ -238,6 +270,8 @@ export function WebcamPanel() {
     setResult(null);
     setVerdict(null);
     setConfHistory([]);
+    holdRef.current = INITIAL_HOLD;
+    setHoldProgress(0);
     setCameraState("idle");
   }, []);
 
@@ -366,9 +400,19 @@ export function WebcamPanel() {
               </Button>
             )}
             {warmStatus === "warming" && (
-              <span className="text-sm text-fg-subtle" role="status">
-                Loading model…
-              </span>
+              <div className="flex flex-col gap-1" role="status" aria-live="polite">
+                <span className="text-sm text-fg-subtle">
+                  Loading model…{" "}
+                  {warmProgress > 0 ? `${Math.round(warmProgress * 100)}%` : ""}
+                </span>
+                <div className="h-1 w-40 overflow-hidden rounded-full bg-border">
+                  <div
+                    className="h-full bg-accent-gradient transition-[width] duration-150"
+                    style={{ width: `${Math.round(warmProgress * 100)}%` }}
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
             )}
             {warmStatus === "error" && (
               <span className="text-sm text-amber-400" role="status">
@@ -414,6 +458,63 @@ export function WebcamPanel() {
           {confHistory.length > 1 && (
             <ConfidenceTimeseries points={confHistory} />
           )}
+
+          {/* Fingerspelling word-builder: hold a letter to spell words. */}
+          <div className="rounded-lg border border-border bg-bg p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-fg-muted">
+                Word builder — hold a letter to add it
+              </p>
+              <span className="text-[11px] text-fg-subtle">
+                {word.length} letter{word.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div
+              className="mt-2 min-h-[2.5rem] rounded-md bg-bg-subtle px-3 py-2 font-mono text-2xl tracking-widest text-fg"
+              aria-live="polite"
+              aria-label={word ? `Word so far: ${word.split("").join(" ")}` : "No letters yet"}
+            >
+              {word || <span className="text-base text-fg-subtle">…</span>}
+            </div>
+            {/* Hold-progress bar (reduced-motion safe: it's a width, not an animation). */}
+            <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-border">
+              <div
+                className="h-full bg-accent-gradient transition-[width] duration-100"
+                style={{ width: `${Math.round(holdProgress * 100)}%` }}
+                aria-hidden="true"
+              />
+            </div>
+            <div className="mt-2 flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWord((w) => backspace(w))}
+                disabled={!word}
+              >
+                Backspace
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWord("")}
+                disabled={!word}
+              >
+                Clear
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void navigator.clipboard?.writeText(word)}
+                disabled={!word}
+              >
+                Copy
+              </Button>
+            </div>
+            <p className="mt-2 text-[11px] text-fg-subtle">
+              Hold a confident letter steady for ~1.5s to lock it. Works best for the
+              static letters — J and Z are motion signs and won&apos;t hold reliably.
+            </p>
+          </div>
 
           {/* Guidance */}
           <div className="rounded-lg border border-border bg-bg p-3 text-xs text-fg-subtle">

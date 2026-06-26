@@ -72,4 +72,31 @@ test.describe("in-browser inference", () => {
     // The "coming soon" placeholder must be gone.
     await expect(metrics).not.toContainText(/coming with the calibration/i);
   });
+
+  test("confusion-matrix explorer renders on the dashboard", async ({ page }) => {
+    await page.goto("/");
+    const metrics = page.locator("#metrics");
+    await expect(metrics).toContainText(/Where it gets confused/i, {
+      timeout: 15_000,
+    });
+    // The heatmap is an accessible figure naming the worst confusion.
+    await expect(
+      metrics.getByRole("img", { name: /confusion matrix over \d+ classes/i }),
+    ).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("upload via file input classifies a chosen image", async ({ page }) => {
+    await page.goto("/");
+    const upload = page.locator("#upload");
+    // Set a real file on the hidden <input type=file> (the same path drag-drop
+    // and the picker both feed). Reuses a committed example fixture.
+    const examplePath = path.resolve(__dirname, "../public/examples/L.png");
+    await upload.locator('input[type="file"]').setInputFiles(examplePath);
+    // A raw file upload (no known label) still runs the full classify path and
+    // renders the "Predicted" result + the top-5 confidence bars.
+    await expect(upload).toContainText(/Predicted/i, { timeout: 30_000 });
+    await expect(upload.getByText("L", { exact: true }).first()).toBeVisible({
+      timeout: 30_000,
+    });
+  });
 });
