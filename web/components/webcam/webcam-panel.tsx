@@ -66,7 +66,13 @@ const HAND_LOST_RESET_MS = 600;
 
 export function WebcamPanel() {
   const reduceMotion = useReducedMotion();
-  const { status: warmStatus, error: warmError, warmUp, classify } = useClassifier();
+  const {
+    status: warmStatus,
+    error: warmError,
+    progress: warmProgress,
+    warmUp,
+    classify,
+  } = useClassifier();
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -394,9 +400,19 @@ export function WebcamPanel() {
               </Button>
             )}
             {warmStatus === "warming" && (
-              <span className="text-sm text-fg-subtle" role="status">
-                Loading model…
-              </span>
+              <div className="flex flex-col gap-1" role="status" aria-live="polite">
+                <span className="text-sm text-fg-subtle">
+                  Loading model…{" "}
+                  {warmProgress > 0 ? `${Math.round(warmProgress * 100)}%` : ""}
+                </span>
+                <div className="h-1 w-40 overflow-hidden rounded-full bg-border">
+                  <div
+                    className="h-full bg-accent-gradient transition-[width] duration-150"
+                    style={{ width: `${Math.round(warmProgress * 100)}%` }}
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
             )}
             {warmStatus === "error" && (
               <span className="text-sm text-amber-400" role="status">
