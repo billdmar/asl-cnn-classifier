@@ -70,7 +70,8 @@ make install
 
 > Heads-up: with no trained checkpoint present, the app (and CLI) fall back to
 > an **untrained random-init** model — predictions are meaningless and the UI
-> says so. Train a model first (see [Reproducing 98%](#reproducing-the-98-accuracy-target))
+> says so. Train a model first (see
+> [Reproducing the deployed model](#reproducing-the-deployed-model-555-honest-cross-dataset))
 > for real results.
 
 ---
@@ -135,7 +136,6 @@ make install
 | Macro F1 — same-dataset held-out | **0.969** | measured |
 | Validation accuracy (best epoch) | **97.3%** | measured during `make train-diverse-hemg` |
 | Expected Calibration Error (ECE, 10 bins) | **0.025** | measured (`make calibration`, held-out test split, T=1.0) |
-| Test accuracy — MobileNetV2, full 29-class Kaggle set | ≥98% (target) | aspirational |
 | Custom-CNN parameters | **656,829** | measured (`tests/test_model.py` asserts this) |
 | CPU inference latency (mean) | **5.08 ms/frame** | measured, this machine |
 | CPU throughput | **197 FPS** | measured, this machine |
@@ -155,7 +155,8 @@ than committed, and the exact figures vary with hardware. On a CPU sandbox,
 The fastest path from a clean clone to a running pipeline — entirely on the
 committed 232-image synthetic sample (no Kaggle download, no GPU). This proves
 the wiring end-to-end; it does **not** produce meaningful accuracy (that needs
-the real dataset — see [Reproducing 98%](#reproducing-the-98-accuracy-target)).
+the real dataset — see
+[Reproducing the deployed model](#reproducing-the-deployed-model-555-honest-cross-dataset)).
 
 ```bash
 # 0. Prereq: install uv (https://docs.astral.sh/uv/) — e.g. `brew install uv`.
