@@ -6,4 +6,4 @@
 # `gradio` and this file is named `requirements.txt` in the Space — see
 # docs/DEPLOY.md for how the core deps are combined for deployment.
 -r requirements.txt
-gradio>=4.0,<6.0
+gradio>=6.19.0,<7.0
