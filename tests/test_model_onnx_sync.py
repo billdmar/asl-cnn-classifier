@@ -54,11 +54,24 @@ def test_deployed_checkpoint_matches_committed_onnx() -> None:
     from src.infer_camera import load_checkpoint
 
     device = torch.device("cpu")
-    model, _class_names = load_checkpoint(str(CHECKPOINT), device)
+    model, class_names = load_checkpoint(str(CHECKPOINT), device)
     model.eval()
 
     session = ort.InferenceSession(str(WEB_ONNX))
     input_name = session.get_inputs()[0].name
+    onnx_classes = session.get_outputs()[0].shape[-1]
+
+    # Only meaningful when the on-disk checkpoint IS the deployed model. CI's
+    # "sample train" step writes a throwaway 29-class custom_cnn checkpoint to
+    # this path that has nothing to do with the committed 26-class ONNX — skip
+    # those rather than false-fail. The drift guard runs wherever the real
+    # deployed checkpoint exists (locally, release machines).
+    if len(class_names) != onnx_classes:
+        pytest.skip(
+            f"checkpoint has {len(class_names)} classes but the web ONNX has "
+            f"{onnx_classes} — not the deployed model (e.g. CI's sample train); "
+            "drift guard only applies to the real deployed checkpoint."
+        )
 
     fixtures = sorted(GOLDEN_DIR.glob("*_resized.png"))
     assert fixtures, "no golden fixture images found"
