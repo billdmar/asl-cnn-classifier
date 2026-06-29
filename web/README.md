@@ -55,6 +55,9 @@ npm run build          # static export → out/
 ## Honesty
 
 Every displayed metric is produced by repo code on a real set and labeled with
-its source (benchmark vs real-world). Headline numbers today: **96.8% held-out
-test accuracy**, **97.8% validation** — both measured. Real-world webcam accuracy
-is lower and is reported separately as it is measured.
+its source (benchmark vs real-world). The **headline number is the honest
+cross-dataset accuracy: 55.5% across 26 classes / 59.8% on the static A–Y
+letters**, measured on a dataset the model never trained on. The same-dataset
+benchmark (**96.9%**) is shown only to make the leakage gap visible — never as
+the real-world figure. See the root [`../README.md`](../README.md) and
+[`../MODEL_CARD.md`](../MODEL_CARD.md) for the full investigation.
