@@ -34,7 +34,7 @@ jobs:
             echo "::notice::VERCEL_TOKEN not set — skipping deploy. Deploy manually with 'vercel --prod' (see docs/DEPLOY.md)."
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: steps.gate.outputs.enabled == 'true'
 
       - name: Install Vercel CLI
