@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { Reveal } from "@/components/ui/reveal";
 import { cn } from "@/lib/utils";
 
 interface StorySectionProps {
@@ -32,15 +33,20 @@ export function StorySection({
       aria-labelledby={headingId}
       className={cn("scroll-mt-24", className)}
     >
-      {eyebrow ? (
-        <p className="mb-2 text-sm font-medium uppercase tracking-wide text-accent">
-          {eyebrow}
-        </p>
-      ) : null}
-      <h2 id={headingId} className="text-2xl font-bold text-fg sm:text-3xl">
-        {title}
-      </h2>
-      <div className="mt-5 text-pretty leading-relaxed text-fg-muted">{children}</div>
+      {/* Heading block reveals first, then the content follows on scroll. */}
+      <Reveal>
+        {eyebrow ? (
+          <p className="mb-2 text-sm font-medium uppercase tracking-wide text-accent">
+            {eyebrow}
+          </p>
+        ) : null}
+        <h2 id={headingId} className="text-2xl font-bold text-fg sm:text-3xl">
+          {title}
+        </h2>
+      </Reveal>
+      <Reveal delay={0.08} className="mt-5 text-pretty leading-relaxed text-fg-muted">
+        {children}
+      </Reveal>
     </section>
   );
 }

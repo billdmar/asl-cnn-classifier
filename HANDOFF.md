@@ -1,6 +1,49 @@
 # HANDOFF — ASL CNN Classifier
 
-_Last updated: 2026-06-26. Branch: `main` @ `7691c19` (clean, in sync with origin)._
+_Last updated: 2026-06-28. Branch: `feat/product-overhaul-round` (off `main` @ `b142e40`);
+4 commits, all gates green, awaiting user push + PR._
+
+## ✅ THIS ROUND — product-overhaul, DONE (both tracks)
+Branch `feat/product-overhaul-round`. The two-track round below was executed; nothing is
+left to build. **Next action: user pushes the branch, then I open the PR (CI is green
+locally) → review → merge → `vercel --prod`.**
+
+**Track A — gated accuracy experiment: NEGATIVE, not shipped.** SWA + label-smoothing 0.1
+(`configs/train_real_mobilenet_diverse_hemg_swa.yaml`, both config-gated default-off in
+`src/train.py`) trained + evaluated on the cross-dataset gate → **53.65% 26-class / 57.82%
+A-Y**, i.e. **−1.8 / −2.0 pt vs the deployed 55.5%/59.8%** (label smoothing flattens the
+already-thin class margins under shift; SWA basin-averaging compounds it). The +2pt-on-both
+bar was not met, so the **deployed model + ONNX + fixtures + web metrics are UNCHANGED**.
+Documented in `docs/EXPERIMENT_swa_label_smoothing.md`. The gated wiring is kept (default-off,
+byte-identical) so it's reproducible and reusable if a more-diverse dataset reopens accuracy.
+
+**Track B — animated UI overhaul: SHIPPED.** S0 motion primitives (`web/lib/motion.ts`,
+`web/components/ui/reveal.tsx`, `web/lib/use-count-up.ts` + shimmer/gradient-pan keyframes)
+consumed across landing / metrics / live-demo / upload / about. Subtle/fast/premium,
+reduced-motion respected, transform/opacity-only. **All gates green:** tsc strict, eslint,
+73 unit/parity, static build, 10/10 Playwright e2e (smoke+inference+axe a11y on / and
+/about), Lighthouse median **perf 0.93 / a11y 1.0 / best-practices 1.0 / seo 1.0** (all ≥0.90).
+
+**3 integration-pass lessons (root-caused, not papered over) — heed these for any future
+motion work:**
+1. **Reveal entrance is TRANSFORM-ONLY (translateY, no opacity).** An opacity fade leaves
+   text at sub-AA contrast mid-animation, which **axe catches at page load on /about** (it
+   scans before scroll). Transform-only = same `rise-up` discipline as the hero; axe + LCP safe.
+2. **Don't wrap interactive panels in a scroll-reveal.** A reveal transform on the
+   upload/webcam controls keeps their bounding box unstable, which **stalls Playwright
+   click-actionability** (broke the example-classify e2e — `bbox.y` flips from undefined to
+   settled). Reveal only the heading; the panels still enter via `LazyVisible`.
+3. **framer `whileHover` + `AnimatePresence mode="wait"` interfere with automated clicks.**
+   Use CSS hover/active (`motion-safe:hover:-translate-y-0.5`) for interactive controls;
+   drop `mode="wait"` on fixed-height panels (no CLS benefit, real interaction cost).
+
+**Local-env gotcha:** this sandbox can't fetch Playwright's pinned `chromium_headless_shell`
+build (CDN download silently no-ops). Ran e2e + Lighthouse against **system Google Chrome**
+via `channel: "chrome"` / `CHROME_PATH`. CI installs the shell normally and will pass.
+
+---
+
+_Earlier state (still accurate below):_
 
 ## Goal
 A portfolio-grade American Sign Language **alphabet (A–Z) image classifier** with an

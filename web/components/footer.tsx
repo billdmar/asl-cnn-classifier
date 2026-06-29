@@ -1,11 +1,13 @@
 import { Github } from "lucide-react";
 
+import { Reveal } from "@/components/ui/reveal";
+
 const REPO_URL = "https://github.com/billdmar/asl-cnn-classifier";
 
 export function Footer() {
   return (
     <footer className="border-t border-border">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-10 text-sm text-fg-muted sm:flex-row sm:items-center sm:justify-between">
+      <Reveal className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-10 text-sm text-fg-muted sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-2">
           <a
             href={REPO_URL}
@@ -22,7 +24,7 @@ export function Footer() {
           Every metric shown here is produced by reproducible code in the repo — nothing
           is hand-edited.
         </p>
-      </div>
+      </Reveal>
     </footer>
   );
 }

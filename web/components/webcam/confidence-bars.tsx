@@ -12,6 +12,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 
 import { formatPct } from "@/lib/confidence";
+import { transition } from "@/lib/motion";
 import type { Prediction } from "@/lib/inference";
 import { cn } from "@/lib/utils";
 
@@ -58,11 +59,10 @@ export function ConfidenceBars({
                       ? "bg-amber-400/80"
                       : "bg-border",
                 )}
-                initial={reduceMotion ? false : { width: 0 }}
-                animate={{ width: `${pct * 100}%` }}
-                transition={
-                  reduceMotion ? { duration: 0 } : { duration: 0.4, ease: "easeOut" }
-                }
+                // Top bar also gets a brief opacity fade-in for emphasis.
+                initial={reduceMotion ? false : { width: 0, opacity: isTop ? 0 : 1 }}
+                animate={{ width: `${pct * 100}%`, opacity: 1 }}
+                transition={reduceMotion ? { duration: 0 } : transition}
               />
             </div>
             <span

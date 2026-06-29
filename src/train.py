@@ -31,6 +31,7 @@ import numpy as np
 import torch
 import yaml
 from torch import nn
+from torch.optim.swa_utils import AveragedModel, SWALR, update_bn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import utils as tv_utils
@@ -373,10 +374,36 @@ def main() -> None:
         print(
             f"Class-weighted loss (inverse-frequency) enabled: {class_weight.tolist()}"
         )
-    criterion = nn.CrossEntropyLoss(weight=class_weight)
+    # Optional label smoothing softens the one-hot targets, which can improve
+    # generalization + calibration. Off by default (0.0) → standard CE,
+    # byte-identical to before.
+    label_smoothing = float(config.get("label_smoothing", 0.0))
+    if label_smoothing > 0.0:
+        print(f"Label smoothing enabled: {label_smoothing:g}")
+    criterion = nn.CrossEntropyLoss(
+        weight=class_weight, label_smoothing=label_smoothing
+    )
     optimizer = build_optimizer(model, config, base_lr)
     scheduler = build_scheduler(optimizer, config, t_max=num_epochs)
     is_plateau = isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
+
+    # --- Optional Stochastic Weight Averaging (SWA) ---
+    # When enabled, the final ~tail of training switches to a constant SWA LR and
+    # the weights from each tail epoch are averaged; BN stats are recomputed over
+    # the train loader at the end. The averaged model is saved as the checkpoint.
+    # Off by default → no AveragedModel, no SWALR, byte-identical to before.
+    use_swa = bool(config.get("use_swa", False))
+    swa_start_epoch = int(config.get("swa_start_epoch", num_epochs))
+    swa_lr = float(config.get("swa_lr", base_lr / 10.0))
+    swa_model: AveragedModel | None = None
+    swa_scheduler: SWALR | None = None
+    swa_n_updates = 0
+    if use_swa:
+        swa_model = AveragedModel(model)
+        print(
+            f"SWA enabled: averaging from epoch {swa_start_epoch} "
+            f"at constant LR {swa_lr:g}."
+        )
 
     writer = SummaryWriter(log_dir=config["tensorboard_dir"])
 
@@ -439,8 +466,20 @@ def main() -> None:
             )
             writer.add_image("train/augmented_batch", grid, global_step=epoch)
 
-        # Step the scheduler (plateau needs the monitored metric).
-        if is_plateau:
+        # Step the scheduler (plateau needs the monitored metric). Once the SWA
+        # phase begins, switch to the constant SWA LR and average the weights
+        # from each tail epoch instead of following the base schedule.
+        in_swa_phase = use_swa and epoch >= swa_start_epoch
+        if in_swa_phase:
+            assert swa_model is not None  # implied by use_swa
+            if swa_scheduler is None:
+                # Bind SWALR to the current (post-warmup) optimizer the first
+                # time we enter the SWA phase.
+                swa_scheduler = SWALR(optimizer, swa_lr=swa_lr)
+            swa_model.update_parameters(model)
+            swa_n_updates += 1
+            swa_scheduler.step()
+        elif is_plateau:
             scheduler.step(val_loss)
         else:
             scheduler.step()
@@ -494,6 +533,42 @@ def main() -> None:
                     f"val loss has not improved for {patience} epoch(s)."
                 )
                 break
+
+    # --- SWA finalization ---
+    # The averaged weights need their BatchNorm running stats recomputed over the
+    # train data (SWA never updated them). We then evaluate the averaged model and
+    # save IT as the checkpoint — the averaged model is the SWA deliverable, so it
+    # overwrites the per-epoch best regardless of val accuracy.
+    if use_swa and swa_model is not None and swa_n_updates > 0:
+        print(
+            f"SWA: recomputing BN stats over the train loader "
+            f"({swa_n_updates} averaged epoch(s))."
+        )
+        update_bn(train_loader, swa_model, device=device)
+        swa_val_loss, swa_val_acc = run_epoch(
+            swa_model,
+            val_loader,
+            criterion,
+            device,
+            optimizer=None,
+            scaler=scaler,
+            use_amp=use_amp,
+            autocast_enabled=autocast_enabled,
+        )
+        print(f"SWA averaged model | val_loss {swa_val_loss:.4f} acc {swa_val_acc:.4f}")
+        # AveragedModel wraps the net in `.module`; save the underlying state dict
+        # so it loads into a plain build_model() net like every other checkpoint.
+        torch.save(
+            {
+                "model_state_dict": swa_model.module.state_dict(),
+                "arch": str(config["arch"]),
+                "class_names": class_names,
+                "config": config,
+                "val_accuracy": swa_val_acc,
+            },
+            best_path,
+        )
+        best_val_acc = swa_val_acc
 
     writer.close()
 
