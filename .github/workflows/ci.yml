@@ -100,8 +100,30 @@ jobs:
       - name: Production build (static export)
         run: npm run build
 
+      # Resolve the installed Playwright version so the browser cache key tracks
+      # it — a Playwright bump invalidates the cache and re-downloads the matching
+      # browser build.
+      - name: Resolve Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.pw.outputs.version }}
+
+      # On a cache hit, only the OS deps need installing (the browser binary is
+      # restored from cache); on a miss, install the browser too. Either way the
+      # specs run against the version pinned in package-lock.
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: |
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
 
       - name: E2E tests
         run: npm run test:e2e
