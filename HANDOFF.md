@@ -3,10 +3,38 @@
 _Last updated: 2026-06-29. Branch: `feat/web-product-features` (off `main` @ `34e5932`);
 4 commits, all gates green locally, awaiting user push + PR._
 
-## ✅ LATEST ROUND — web product features, DONE
-Branch `feat/web-product-features` (the prior product-overhaul round merged as PR #19).
-Four static-export web features, built by parallel agent teams (disjoint file ownership),
-all gates green. **Next action: user pushes → I open the PR → review → merge → `vercel --prod`.**
+## ✅ LATEST ROUND — dark/light theme toggle, DONE
+Branch `feat/theme-toggle` (off `main` @ `2e1a021`); 3 commits, all gates green locally,
+awaiting user push + PR. The previously-twice-deferred high-risk feature, now safe to do.
+
+- **CSS-var migration**: 11 hardcoded-hex Tailwind tokens → `rgb(var(--x)/<alpha-value>)`;
+  dark on `:root` (byte-identical default), contrast-verified light on `[data-theme=light]`
+  in globals.css. Token-based components auto-themed (no edits). Gradients special-cased
+  (can't use the alpha slot → literal alpha).
+- **Light accent darkened** `#7c5cff`→`#5b3df5` (brand purple fails AA on white ~3.6:1; new
+  is 6.12:1). Audit computed every fg/bg pair ≥AA before writing.
+- **No-FOUC** inline script in layout.tsx sets `data-theme` pre-paint (default dark);
+  `suppressHydrationWarning` on `<html>`. Toggle (`components/theme-toggle.tsx`) seeds from
+  the live attribute (not localStorage) → no hydration mismatch.
+- **Non-token colors** (recharts, heatmap) themed via `rgb(var(--chart-*))` in SVG props;
+  heatmap uses `color-mix` over themed card bg. Canvas ROI stroke + OG/favicon left fixed
+  (intentional — drawn over video / standalone branded assets).
+- **Dual-theme a11y gate**: `a11y.spec.ts` now loops dark+light, waits 500ms for
+  `transition-colors` to settle (WCAG applies to settled state), runs axe per theme. Caught
+  + fixed a real light-only `link-in-text-block` (footer SHA link → underline).
+
+Gates: tsc, lint, **127 unit** (+6 theme), build, **18 e2e** (a11y green in BOTH themes),
+Lighthouse perf/a11y ≥0.90 on `/` and `/result`. Lesson: a programmatic `data-theme` swap
+samples mid-`transition-colors` (axe saw a transient blended 1.02:1) — wait for settle, or
+real toggles fade fine. Theme work is the last substantial unbuilt feature; the product is
+now feature-complete pending only the deploy.
+
+---
+
+## Earlier round — web product features, MERGED as PR #20
+Four static-export web features (IndexedDB model cache, share permalinks, keyboard shortcuts,
+freshness footer), built by parallel agent teams (disjoint file ownership), all gates green —
+**merged as PR #20** (squash `2e1a021`).
 
 - **IndexedDB model cache + slow-network resilience** (Stream A) — ~9 MB model cached keyed by
   build SHA; repeat visits zero-refetch; 12 s slow-load hint + retry. Both webcam AND upload

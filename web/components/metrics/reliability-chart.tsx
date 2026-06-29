@@ -14,10 +14,10 @@ import {
 
 import { toReliabilityRows, type CalibrationData } from "@/lib/metrics";
 
-const ACCENT = "#7c5cff";
-const DIAGONAL = "#6a6a7a";
-const GRID = "#23232f";
-const TEXT_MUTED = "#a0a0b0";
+const ACCENT = "rgb(var(--chart-accent))";
+const DIAGONAL = "rgb(var(--chart-diagonal))";
+const GRID = "rgb(var(--chart-grid))";
+const TEXT_MUTED = "rgb(var(--fg-muted))";
 
 interface ChartPoint {
   /** Bin midpoint, shared x for both the model curve and the diagonal. */

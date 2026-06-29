@@ -39,7 +39,7 @@ export function Footer() {
                 href={build.commitUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded transition-colors hover:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                className="rounded underline decoration-border underline-offset-2 transition-colors hover:text-fg-muted hover:decoration-fg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
               >
                 build {build.shortSha}
               </a>

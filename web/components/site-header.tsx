@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Github, HelpCircle } from "lucide-react";
 
 import { KeyboardHelpDialog } from "@/components/keyboard-help-dialog";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useKeyboardShortcuts } from "@/lib/use-keyboard-shortcuts";
 import { cn } from "@/lib/utils";
 
@@ -79,6 +80,7 @@ export function SiteHeader() {
           >
             <HelpCircle className="h-5 w-5" aria-hidden="true" />
           </button>
+          <ThemeToggle />
           <a
             href={REPO_URL}
             target="_blank"

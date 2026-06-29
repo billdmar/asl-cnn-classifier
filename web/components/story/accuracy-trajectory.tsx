@@ -12,9 +12,9 @@ import {
   YAxis,
 } from "recharts";
 
-const ACCENT = "#7c5cff";
-const ACCENT_2 = "#2dd4bf";
-const TEXT_MUTED = "#a0a0b0";
+const ACCENT = "rgb(var(--chart-accent))";
+const ACCENT_2 = "rgb(var(--chart-accent-2))";
+const TEXT_MUTED = "rgb(var(--fg-muted))";
 
 /** The honest cross-dataset accuracy at each training-data milestone. */
 const TRAJECTORY = [
@@ -74,7 +74,7 @@ export function AccuracyTrajectory() {
                   dataKey="acc"
                   position="top"
                   formatter={(v: number) => `${v}%`}
-                  fill="#f5f5fa"
+                  fill="rgb(var(--fg))"
                   fontSize={13}
                   fontWeight={700}
                 />

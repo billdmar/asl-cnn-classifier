@@ -4,6 +4,51 @@
 
 :root {
   color-scheme: dark;
+
+  /* Theme tokens as space-separated RGB channels so Tailwind's <alpha-value>
+     slot keeps working (bg-bg/50, text-fg-muted/80, border-accent/40, …).
+     Dark is the default theme; [data-theme="light"] below overrides. */
+  --bg: 10 10 15; /* #0a0a0f */
+  --bg-subtle: 16 16 24; /* #101018 */
+  --bg-card: 19 19 28; /* #13131c */
+  --border: 35 35 47; /* #23232f */
+  --border-subtle: 26 26 36; /* #1a1a24 */
+  --fg: 245 245 250; /* #f5f5fa */
+  --fg-muted: 160 160 176; /* #a0a0b0 */
+  --fg-subtle: 130 130 146; /* #828292 */
+  --accent: 124 92 255; /* #7c5cff */
+  --accent-from: 124 92 255; /* #7c5cff */
+  --accent-to: 45 212 191; /* #2dd4bf */
+
+  /* Non-token colors consumed directly by charts / heatmap (see the metrics
+     and story components). Defined per-theme so SVG var() refs adapt. */
+  --chart-accent: 124 92 255; /* = accent */
+  --chart-accent-2: 45 212 191; /* = accent.to */
+  --chart-grid: 35 35 47; /* = border */
+  --chart-diagonal: 106 106 122; /* #6a6a7a */
+  --heatmap-empty: 30 30 40; /* empty confusion cell */
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: 255 255 255; /* #ffffff */
+  --bg-subtle: 244 244 247; /* #f4f4f7 */
+  --bg-card: 251 251 253; /* #fbfbfd */
+  --border: 215 215 224; /* #d7d7e0 */
+  --border-subtle: 232 232 238; /* #e8e8ee */
+  --fg: 21 21 28; /* #15151c */
+  --fg-muted: 82 82 95; /* #52525f */
+  --fg-subtle: 107 107 120; /* #6b6b78 */
+  --accent: 91 61 245; /* #5b3df5 — darkened so it clears AA on white (6.12:1) */
+  --accent-from: 91 61 245; /* #5b3df5 */
+  --accent-to: 13 148 136; /* #0d9488 — teal-600 */
+
+  --chart-accent: 91 61 245;
+  --chart-accent-2: 13 148 136;
+  --chart-grid: 226 226 234; /* #e2e2ea pale grid */
+  --chart-diagonal: 118 118 133; /* #767685 */
+  --heatmap-empty: 244 244 247; /* light empty cell = bg-subtle */
 }
 
 body {

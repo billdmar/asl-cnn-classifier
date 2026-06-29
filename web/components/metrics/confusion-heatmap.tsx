@@ -80,10 +80,13 @@ function Row({
 
 /** Map a 0–1 fraction to a color: teal for the diagonal, amber for confusions. */
 function cellColor(fraction: number, isDiagonal: boolean): string {
-  if (fraction <= 0) return "rgb(30 30 40)"; // empty cell, bg-subtle-ish
-  const alpha = 0.15 + 0.85 * Math.min(1, fraction);
+  // Empty cell blends to the themed empty-cell color (dark on dark, pale on light).
+  if (fraction <= 0) return "rgb(var(--heatmap-empty))";
+  // Blend the (theme-independent, semantic) hue over the THEMED card bg so the
+  // composite reads correctly on either backdrop. A small floor keeps faint
+  // cells visible against a white page.
+  const strength = 0.2 + 0.8 * Math.min(1, fraction);
   // diagonal = accent teal (good); off-diagonal = amber (confusion).
-  return isDiagonal
-    ? `rgba(45, 212, 191, ${alpha})`
-    : `rgba(251, 191, 36, ${alpha})`;
+  const hue = isDiagonal ? "#2dd4bf" : "#fbbf24";
+  return `color-mix(in srgb, ${hue} ${(strength * 100).toFixed(1)}%, rgb(var(--bg-card)))`;
 }

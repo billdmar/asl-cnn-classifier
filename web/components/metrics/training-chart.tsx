@@ -15,10 +15,10 @@ import {
 
 import type { TrainingHistory } from "@/lib/metrics";
 
-const ACCENT = "#7c5cff";
-const ACCENT_2 = "#2dd4bf";
-const GRID = "#23232f";
-const TEXT_MUTED = "#a0a0b0";
+const ACCENT = "rgb(var(--chart-accent))";
+const ACCENT_2 = "rgb(var(--chart-accent-2))";
+const GRID = "rgb(var(--chart-grid))";
+const TEXT_MUTED = "rgb(var(--fg-muted))";
 
 interface CurvePoint {
   epoch: number;

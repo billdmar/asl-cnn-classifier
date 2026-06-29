@@ -5,24 +5,36 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Dark "AI product" palette. Background near-black, single accent gradient.
+        // Themeable palette: tokens resolve through CSS vars defined in
+        // app/globals.css (:root = dark default, [data-theme="light"] = light).
+        // The `<alpha-value>` slot keeps opacity utilities (bg-bg/50, …) working.
         bg: {
-          DEFAULT: "#0a0a0f",
-          subtle: "#101018",
-          card: "#13131c",
+          DEFAULT: "rgb(var(--bg) / <alpha-value>)",
+          subtle: "rgb(var(--bg-subtle) / <alpha-value>)",
+          card: "rgb(var(--bg-card) / <alpha-value>)",
         },
-        border: { DEFAULT: "#23232f", subtle: "#1a1a24" },
-        fg: { DEFAULT: "#f5f5fa", muted: "#a0a0b0", subtle: "#828292" },
+        border: {
+          DEFAULT: "rgb(var(--border) / <alpha-value>)",
+          subtle: "rgb(var(--border-subtle) / <alpha-value>)",
+        },
+        fg: {
+          DEFAULT: "rgb(var(--fg) / <alpha-value>)",
+          muted: "rgb(var(--fg-muted) / <alpha-value>)",
+          subtle: "rgb(var(--fg-subtle) / <alpha-value>)",
+        },
         accent: {
-          DEFAULT: "#7c5cff",
-          from: "#7c5cff",
-          to: "#2dd4bf",
+          DEFAULT: "rgb(var(--accent) / <alpha-value>)",
+          from: "rgb(var(--accent-from) / <alpha-value>)",
+          to: "rgb(var(--accent-to) / <alpha-value>)",
         },
       },
       backgroundImage: {
-        "accent-gradient": "linear-gradient(135deg, #7c5cff 0%, #2dd4bf 100%)",
+        // Gradients can't use the <alpha-value> slot (it's only substituted by
+        // Tailwind's color-utility machinery), so alpha is pinned literally.
+        "accent-gradient":
+          "linear-gradient(135deg, rgb(var(--accent-from)) 0%, rgb(var(--accent-to)) 100%)",
         "accent-radial":
-          "radial-gradient(60% 60% at 50% 0%, rgba(124,92,255,0.18) 0%, rgba(10,10,15,0) 100%)",
+          "radial-gradient(60% 60% at 50% 0%, rgb(var(--accent) / 0.18) 0%, rgb(var(--bg) / 0) 100%)",
       },
       fontFamily: {
         // System font stack — no web-font fetch, so text paints immediately

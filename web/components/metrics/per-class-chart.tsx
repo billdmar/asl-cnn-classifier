@@ -15,10 +15,10 @@ import {
 
 import type { ClassRow } from "@/lib/metrics";
 
-const ACCENT = "#7c5cff";
-const ACCENT_LOW = "#2dd4bf";
-const GRID = "#23232f";
-const TEXT_MUTED = "#a0a0b0";
+const ACCENT = "rgb(var(--chart-accent))";
+const ACCENT_LOW = "rgb(var(--chart-accent-2))";
+const GRID = "rgb(var(--chart-grid))";
+const TEXT_MUTED = "rgb(var(--fg-muted))";
 
 /** Letters with the very best F1 get the teal accent; the rest the purple. */
 const HIGH_F1 = 0.99;
@@ -74,7 +74,7 @@ export function PerClassChart({ rows }: { rows: ClassRow[] }) {
           width={48}
         />
         <Tooltip
-          cursor={{ fill: "rgba(124,92,255,0.08)" }}
+          cursor={{ fill: "rgb(var(--chart-accent) / 0.12)" }}
           content={<PerClassTooltip />}
         />
         <Bar dataKey="f1" radius={[3, 3, 0, 0]} isAnimationActive={!reduceMotion}>
