@@ -1,46 +1,56 @@
-# ASL Sign-Language CNN — Real-Time Image Classifier
+# ASL Alphabet Classifier — Live In-Browser ML Web App
 
-**Full ML-engineering lifecycle for 29-class ASL recognition: PyTorch CNN + MobileNetV2 transfer learning, real-time OpenCV inference, and rigorous benchmarking.**
+**A production-quality web app that recognizes American Sign Language letters from your webcam, running the model 100% in the browser — plus an honest, fully-documented account of what it actually achieves on a stranger's hand.**
 
-Recognize American Sign Language hand signs across all **29 classes** (A–Z plus
-*space*, *delete*, *nothing*) with a PyTorch CNN, then run the trained model in a
-**live OpenCV camera loop** for real-time classification. The project covers the
-full ML-engineering lifecycle: dataset ingestion, stratified splitting,
-augmentation-aware training, confusion-matrix evaluation, live inference, and a
-latency/throughput benchmark with preprocessing ablations and distribution-shift
-analysis.
+### ▶ Live demo: **[asl-cnn-classifier.vercel.app](https://asl-cnn-classifier.vercel.app)** — no install, runs entirely client-side
 
+[![Live demo](https://img.shields.io/badge/Live_demo-asl--cnn--classifier.vercel.app-000000?logo=vercel&logoColor=white)](https://asl-cnn-classifier.vercel.app)
 [![CI](https://github.com/billdmar/asl-cnn-classifier/actions/workflows/ci.yml/badge.svg)](https://github.com/billdmar/asl-cnn-classifier/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?logo=python&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+![ONNX Runtime](https://img.shields.io/badge/ONNX_Runtime-web-005CED?logo=onnx&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white)
-![OpenCV](https://img.shields.io/badge/OpenCV-4.x-5C3EE8?logo=opencv&logoColor=white)
 ![Coverage](https://img.shields.io/badge/coverage-96%25%20(CI%20gate%20%E2%89%A580%25)-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+A polished Next.js + TypeScript site runs a MobileNetV2 ASL classifier **100% in the
+browser** via onnxruntime-web + MediaPipe hand-crop — live webcam frames never leave your
+device. It ships as an installable, offline-capable PWA with IndexedDB model caching,
+shareable result permalinks, a dark/light theme, keyboard shortcuts, and an interactive
+metrics dashboard wired to real, reproducible artifacts. Behind it sits the full
+ML-engineering lifecycle: training, ONNX export with a cross-language preprocessing-parity
+gate, calibration, benchmarking, and CI (TypeScript-strict, unit + parity + Playwright E2E +
+Lighthouse budget). The defining engineering decision is **intellectual honesty about
+accuracy**: the headline number is **55.5% cross-dataset (59.8% on the static A–Y letters)**
+on data the model never trained on — *not* the leakage-inflated 96.9% same-dataset figure —
+with every accuracy lever I tried and rejected documented to a formal "supply-exhausted"
+closure.
+
+![ASL Classifier — live in-browser web app](docs/web-hero.png)
+
+*The live app: ASL letters classified from the webcam entirely client-side via
+onnxruntime-web — frames never leave the browser. The headline number is the honest
+real-world figure (55.5% cross-dataset / 59.8% on static A–Y), not the leakage-inflated
+same-dataset benchmark.*
+
 ---
 
-## Live demo
+## Run the web app
 
-### 👉 [**asl-cnn-classifier.vercel.app**](https://asl-cnn-classifier.vercel.app)
-
-The flagship demo is a **polished in-browser website** (`web/`, Next.js +
-TypeScript) that runs the real MobileNetV2 model **100% client-side** via
-onnxruntime-web — live webcam classification with MediaPipe hand-crop, image
-upload, an interactive metrics dashboard wired to the real artifacts, and a
-model-card/story page. Webcam frames never leave the browser. It deploys as a
-static site to Vercel; see [`web/README.md`](web/README.md) and
-[`web/DEPLOY.md`](web/DEPLOY.md).
+The flagship is the `web/` site (Next.js + TypeScript, static export to Vercel). Run it
+locally:
 
 ```bash
 cd web && npm install && npm run dev    # http://localhost:3000
 ```
 
-What makes it trustworthy: a **cross-language preprocessing parity gate** proves
-the browser path reproduces the Python pipeline's predictions (strict tensor
-parity ~5e-7), and every displayed number is produced by reproducible code and
-labeled benchmark-vs-real-world. CI enforces TypeScript-strict, lint, unit +
-parity tests, Playwright E2E (including a real in-browser inference assertion),
-and a Lighthouse budget (performance 98 / accessibility 96, gated ≥90).
+See [`web/README.md`](web/README.md) and [`web/DEPLOY.md`](web/DEPLOY.md). What makes it
+trustworthy: a **cross-language preprocessing parity gate** proves the browser path
+reproduces the Python pipeline's predictions (strict tensor parity ~5e-7), and every
+displayed number is produced by reproducible code and labeled benchmark-vs-real-world. CI
+enforces TypeScript-strict, lint, unit + parity tests, Playwright E2E (including a real
+in-browser inference assertion), and a Lighthouse budget (performance 98 / accessibility 96,
+gated ≥90).
 
 Product niceties:
 
@@ -63,20 +73,39 @@ Product niceties:
   served from IndexedDB (the SW deliberately doesn't touch `/model`). Plus
   sitemap / robots / schema.org JSON-LD with the honest accuracy numbers.
 
-### Legacy Gradio demo
+---
 
-A [Gradio](https://gradio.app) app (`app.py`) also lets you upload a hand-sign
-image and see the predicted class plus top-5 probabilities — the optional legacy
-backend the website does not depend on.
+## The honest-accuracy story
 
-### 👉 [**Try the Gradio app on Hugging Face Spaces**](https://huggingface.co/spaces/billdmar/asl-cnn-classifier)
+Most portfolio models report whatever number looks best. This one reports the number that's
+*true*. A naive split of single-signer data gives a flattering **96.9% same-dataset**
+accuracy — but those test images look just like the training images, so it's inflated by
+leakage. The number that matters is **cross-dataset accuracy on a different dataset the model
+never trained on** (different signers, real backgrounds): **55.5% across 26 classes, 59.8% on
+the static A–Y letters** (J and Z are dynamic motion signs a single frame can't capture). I
+treated *that* as the only metric allowed to decide what ships.
 
-![ASL CNN Gradio demo](docs/demo.png)
+Improving it was an experiment, not a guess. Stacking genuinely diverse training datasets
+moved it **33.4% → 47.6% → 55.5%**. Every other lever — crop-consistency, sketch-cleaning,
+augmentation tiers, per-class thresholds, TTA, temperature calibration, class-balanced loss,
+SWA + label smoothing, and two architecture swaps — was measured and **rejected**, then
+written up as a negative result. The investigation closes formally at a documented
+"supply-exhausted" ceiling. Full record: [`docs/`](docs/).
 
-*The live app, running the real MobileNetV2 model (val ≈ 97.8%, held-out test
-96.8% across A–Z). Upload a cropped hand-sign image or click an example and it
-returns the predicted letter with top-5 probabilities. The screenshot predates
-the trained model; the banner reflects whichever checkpoint is currently loaded.*
+![ASL Classifier metrics dashboard — the honest cross-dataset number](docs/web-metrics.png)
+
+*The live metrics dashboard: the honest cross-dataset numbers, the 33→47→55 diversity
+trajectory, and the real 26×26 confusion matrix — every value produced by reproducible repo
+code, never hardcoded.*
+
+---
+
+## Legacy Gradio demo (optional)
+
+Before the web app, the project shipped a [Gradio](https://gradio.app) app (`app.py`) on
+Hugging Face Spaces — upload a hand-sign image, get the predicted class + top-5
+probabilities. It's the optional legacy backend the website does **not** depend on, kept for
+reference: [**Gradio app on Hugging Face Spaces**](https://huggingface.co/spaces/billdmar/asl-cnn-classifier).
 
 > Deployed with one command — `make deploy-hf` (see
 > [`docs/DEPLOY.md`](docs/DEPLOY.md)).
@@ -99,17 +128,26 @@ make install
 
 ## Highlights
 
-- **Two architectures** — a compact from-scratch CNN (~657K params) and a
+- **Live in-browser web app** — Next.js + TypeScript running MobileNetV2 **100%
+  client-side** (onnxruntime-web + MediaPipe), deployed to Vercel as an installable,
+  offline-capable PWA. Webcam frames never leave the device.
+- **Honest accuracy, fully investigated** — the deploy decider is a held-out *cross-dataset*
+  gate (55.5% / 59.8% A–Y), not the leakage-inflated 96.9% benchmark; every rejected lever is
+  documented as a negative result to a formal closure.
+- **Cross-language parity gate** — the browser inference path is proven to reproduce the
+  Python pipeline's predictions to ~5e-7 tensor agreement, enforced in CI.
+- **Two architectures** — a compact from-scratch CNN (~657K params, baseline) and the deployed
   MobileNetV2 transfer-learning fine-tune, selectable via config.
 - **Correct augmentation** — rotation, affine, color jitter, and resized-crop,
   **deliberately without horizontal flip** (ASL signs are not flip-invariant —
   b/d and p/q are mirror images).
 - **Reproducible** — global seeding; file-level stratified 70/15/15 splits
-  (`StratifiedShuffleSplit`) so no augmented view leaks across splits.
-- **Real-time inference** — OpenCV webcam loop with an ROI box, on-screen
-  prediction, confidence, and a rolling FPS counter.
-- **Rigorous evaluation** — 29×29 confusion matrix, per-class F1, top-10
-  confused pairs, and accuracy under five synthetic distribution shifts.
+  (`StratifiedShuffleSplit`) so no augmented view leaks across splits; one-command
+  `make reproduce-deployed`.
+- **Real-time inference** — both the in-browser webcam path and a legacy OpenCV camera loop
+  with an ROI box, on-screen prediction, confidence, and a rolling FPS counter.
+- **Rigorous evaluation** — a 26×26 confusion matrix, per-class F1, top confused
+  pairs, and accuracy under five synthetic distribution shifts.
 - **Explainability & calibration** — from-scratch Grad-CAM saliency overlays and
   Expected Calibration Error (ECE) with a reliability diagram (the ECE math is
   unit-tested against analytically known values).
@@ -127,17 +165,15 @@ make install
 
 ## Results
 
-> **Accuracy status — read this.** Numbers are real and reproduced, and the
-> distinction matters. **Same-dataset** accuracy (train and test from the same
-> sources) is **96.9%** — easy and inflated, because the test images look like the
-> training images. The **honest** number is **cross-dataset accuracy on a
-> *different* dataset** the model never trained on
+> **Accuracy status — read this** (the full narrative is in
+> [The honest-accuracy story](#the-honest-accuracy-story) above). The headline is
+> **cross-dataset accuracy on a *different* dataset** the model never trained on
 > ([`EitanG98/asl_letters`](https://huggingface.co/datasets/EitanG98/asl_letters),
 > different signers and real backgrounds): **59.8% on the 24-letter A–Y headline**
 > (excluding J and Z, which are *dynamic motion signs* a single static frame
 > cannot capture — the mainstream convention, e.g. Sign Language MNIST), or
-> **55.5% across all 26 classes**. This is how the model does on a stranger's
-> hand. It climbed **33.4% → 47.6% → 55.5%** as training added genuinely diverse
+> **55.5% across all 26 classes** — vs an inflated **96.9% same-dataset** benchmark.
+> It climbed **33.4% → 47.6% → 55.5%** as training added genuinely diverse
 > datasets ([`aliciiavs/sign_language_image_dataset`](https://huggingface.co/datasets/aliciiavs/sign_language_image_dataset)
 > then [`Hemg/sign_language_dataset`](https://huggingface.co/datasets/Hemg/sign_language_dataset)),
 > while preprocessing and inference-time tricks (crop, sketch-clean, augmentation,
