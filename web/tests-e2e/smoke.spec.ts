@@ -36,6 +36,12 @@ test.describe("landing page", () => {
     }
   });
 
+  test("footer shows build provenance", async ({ page }) => {
+    await page.goto("/");
+    // Baked in at build time by next.config.mjs: "build <sha|dev>".
+    await expect(page.getByRole("contentinfo")).toContainText(/build\s+\S+/i);
+  });
+
   test("serves the real ONNX model asset", async ({ request }) => {
     const res = await request.get("/model/model.onnx");
     expect(res.status()).toBe(200);
