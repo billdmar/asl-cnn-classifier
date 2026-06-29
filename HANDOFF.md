@@ -1,54 +1,45 @@
 # HANDOFF — ASL CNN Classifier
 
-_Last updated: 2026-06-26. Branch: `main` @ `b142e40` (clean, in sync; PRs #12/#13/#18 merged)._
+_Last updated: 2026-06-28. Branch: `feat/product-overhaul-round` (off `main` @ `b142e40`);
+4 commits, all gates green, awaiting user push + PR._
 
-## ⏭️ NEXT ROUND — planned, NOT yet executed (start here)
-A two-track round was scoped (audits done) but not built. Resume by executing it.
+## ✅ THIS ROUND — product-overhaul, DONE (both tracks)
+Branch `feat/product-overhaul-round`. The two-track round below was executed; nothing is
+left to build. **Next action: user pushes the branch, then I open the PR (CI is green
+locally) → review → merge → `vercel --prod`.**
 
-**Track A — one honest, gated accuracy experiment (likely null; document either way).**
-Accuracy is sourcing-bound, but three genuinely-UNTRIED zero-deploy-cost levers remain.
-Bundle the two cheapest into ONE training run, gated:
-- **SWA** (`torch.optim.swa_utils`: AveragedModel + SWALR for the last ~25% of epochs +
-  `update_bn` over the train loader; save the averaged weights). Still one model → no
-  deploy cost.
-- **Label smoothing** — `nn.CrossEntropyLoss(label_smoothing=0.1)` (src/train.py criterion
-  ~line 360, currently plain CE).
-- Both gated behind config flags, **default-off = byte-identical** to today's training.
-  Clone `configs/train_real_mobilenet_diverse_hemg.yaml` → `..._swa.yaml` with a SEPARATE
-  `checkpoint_dir`. Train (~45min MPS), eval on the gate.
-- **Decision rule:** ship ONLY if cross-dataset 26-class AND A-Y beat 55.5%/59.8% by ≥+2pt
-  (beyond ±3.7 n=712 noise) with no strong-class regression. Else record a negative in a new
-  `docs/EXPERIMENT_*.md` and keep the deployed model. (Ensemble was assessed and SKIPPED —
-  2× web model size/latency fails the Lighthouse perf gate for ~+1pt. Mention, don't build.)
+**Track A — gated accuracy experiment: NEGATIVE, not shipped.** SWA + label-smoothing 0.1
+(`configs/train_real_mobilenet_diverse_hemg_swa.yaml`, both config-gated default-off in
+`src/train.py`) trained + evaluated on the cross-dataset gate → **53.65% 26-class / 57.82%
+A-Y**, i.e. **−1.8 / −2.0 pt vs the deployed 55.5%/59.8%** (label smoothing flattens the
+already-thin class margins under shift; SWA basin-averaging compounds it). The +2pt-on-both
+bar was not met, so the **deployed model + ONNX + fixtures + web metrics are UNCHANGED**.
+Documented in `docs/EXPERIMENT_swa_label_smoothing.md`. The gated wiring is kept (default-off,
+byte-identical) so it's reproducible and reusable if a more-diverse dataset reopens accuracy.
 
-**Track B — aesthetic UI overhaul (the main event; parallelizable).** Site is lean but
-visually plain. framer-motion 11.18 + recharts available; MUST keep reduced-motion respect,
-transform/opacity-only (no layout thrash), SSR-safe (charts behind `mounted`), and
-Lighthouse perf+a11y ≥0.90 (the #1 risk for an animation round). Streams with DISJOINT file
-ownership:
-- **S1 (barrier, do FIRST):** shared motion primitives — a scroll-reveal `useInView` wrapper
-  + a count-up hook (both reduced-motion aware), in `web/components/ui/` or `web/lib/`; new
-  tailwind keyframes (animated gradient/shimmer) in `tailwind.config.ts`/`globals.css`.
-- Then **S2–S5 in parallel** (each owns its files, consumes S1 read-only):
-  - S2 landing choreography — `web/app/page.tsx` section reveals/stagger + hero gradient.
-  - S3 metrics motion — `web/components/metrics/*`: stat-card count-ups, recharts entrance
-    (flip `isAnimationActive` on, gated by reduced-motion), confusion-heatmap cell fade,
-    card stagger.
-  - S4 live-demo polish (**do NOT touch inference logic**) — `web/components/webcam/*`:
-    predicted-letter AnimatePresence exit, confidence-bars stagger, hand-detect glow,
-    word-builder letter pop-in.
-  - S5 upload micro-interactions — `web/components/upload/*`: dropzone hover/drag border,
-    example-button hover scale+glow, result/Grad-CAM fade-in.
-- **S6 (optional, last, abortable):** page transitions via AnimatePresence in layout — flag
-  static-export/SSR + Lighthouse risk; drop if it regresses anything.
-Taste bar: subtle, fast, premium — not busy/garish (this is a credibility piece).
-Full audit detail is in the chat transcript of the session ending 2026-06-26; the file
-ownership above is disjoint so streams won't collide.
+**Track B — animated UI overhaul: SHIPPED.** S0 motion primitives (`web/lib/motion.ts`,
+`web/components/ui/reveal.tsx`, `web/lib/use-count-up.ts` + shimmer/gradient-pan keyframes)
+consumed across landing / metrics / live-demo / upload / about. Subtle/fast/premium,
+reduced-motion respected, transform/opacity-only. **All gates green:** tsc strict, eslint,
+73 unit/parity, static build, 10/10 Playwright e2e (smoke+inference+axe a11y on / and
+/about), Lighthouse median **perf 0.93 / a11y 1.0 / best-practices 1.0 / seo 1.0** (all ≥0.90).
 
-**Ship:** branch `feat/aesthetic-overhaul-and-swa` → per-stream commits (all gates green) →
-integration pass (E2E + lighthouse + axe) → user pushes (git push is agent-blocked) → I
-open PR, watch CI, merge, `vercel --prod`. Track A runs in the background (different
-lang/dir) while Track B builds — fully independent.
+**3 integration-pass lessons (root-caused, not papered over) — heed these for any future
+motion work:**
+1. **Reveal entrance is TRANSFORM-ONLY (translateY, no opacity).** An opacity fade leaves
+   text at sub-AA contrast mid-animation, which **axe catches at page load on /about** (it
+   scans before scroll). Transform-only = same `rise-up` discipline as the hero; axe + LCP safe.
+2. **Don't wrap interactive panels in a scroll-reveal.** A reveal transform on the
+   upload/webcam controls keeps their bounding box unstable, which **stalls Playwright
+   click-actionability** (broke the example-classify e2e — `bbox.y` flips from undefined to
+   settled). Reveal only the heading; the panels still enter via `LazyVisible`.
+3. **framer `whileHover` + `AnimatePresence mode="wait"` interfere with automated clicks.**
+   Use CSS hover/active (`motion-safe:hover:-translate-y-0.5`) for interactive controls;
+   drop `mode="wait"` on fixed-height panels (no CLS benefit, real interaction cost).
+
+**Local-env gotcha:** this sandbox can't fetch Playwright's pinned `chromium_headless_shell`
+build (CDN download silently no-ops). Ran e2e + Lighthouse against **system Google Chrome**
+via `channel: "chrome"` / `CHROME_PATH`. CI installs the shell normally and will pass.
 
 ---
 
