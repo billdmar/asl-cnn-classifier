@@ -29,7 +29,12 @@ export default function AboutPage() {
       <main className="mx-auto max-w-3xl px-6 py-16 sm:py-20">
         <header className="mb-16">
           <Badge variant="accent">Project & model card</Badge>
-          <h1 className="mt-5 text-balance text-4xl font-bold leading-tight text-fg sm:text-5xl">
+          {/*
+           * LCP element for /about: transform-only `animate-rise-up` paints
+           * fully opaque from the first frame (never opacity:0, never JS-wrapped),
+           * so Largest Contentful Paint fires immediately.
+           */}
+          <h1 className="mt-5 animate-rise-up text-balance text-4xl font-bold leading-tight text-fg sm:text-5xl">
             Reading the ASL alphabet, in the browser
           </h1>
           <p className="mt-5 text-pretty text-lg leading-relaxed text-fg-muted">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useReducedMotion } from "framer-motion";
 import {
   Bar,
   BarChart,
@@ -33,6 +34,8 @@ const SUMMARY =
 export function AccuracyTrajectory() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  // Let the bars grow in once on mount, but stay static under reduced motion.
+  const reduce = useReducedMotion();
 
   return (
     <figure role="img" aria-label={SUMMARY} className="w-full">
@@ -57,7 +60,13 @@ export function AccuracyTrajectory() {
                 tickLine={false}
                 width={40}
               />
-              <Bar dataKey="acc" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+              <Bar
+                dataKey="acc"
+                radius={[4, 4, 0, 0]}
+                isAnimationActive={!reduce}
+                animationDuration={400}
+                animationEasing="ease-out"
+              >
                 {TRAJECTORY.map((d, i) => (
                   <Cell key={d.step} fill={i === TRAJECTORY.length - 1 ? ACCENT_2 : ACCENT} />
                 ))}

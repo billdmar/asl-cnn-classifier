@@ -1,5 +1,6 @@
 import { ArrowRight, ArrowDown } from "lucide-react";
 
+import { Reveal, RevealItem } from "@/components/ui/reveal";
 import { cn } from "@/lib/utils";
 
 /**
@@ -63,19 +64,24 @@ function Arrow() {
 
 function FlowRow({ steps }: { steps: ReadonlyArray<FlowStepProps> }) {
   return (
-    <div
-      className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center"
-      aria-hidden="true"
-    >
-      {steps.map((step, i) => (
-        <div
-          key={step.label}
-          className="flex flex-col items-stretch gap-2 sm:flex-1 sm:flex-row sm:items-center"
-        >
-          <FlowStep {...step} />
-          {i < steps.length - 1 ? <Arrow /> : null}
-        </div>
-      ))}
+    // Stagger the steps so the flow builds up node-by-node on scroll. The row is
+    // aria-hidden (the figcaption carries the description), so the motion wrappers
+    // don't affect the accessibility tree.
+    <div aria-hidden="true">
+      <Reveal
+        stagger
+        className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center"
+      >
+        {steps.map((step, i) => (
+          <RevealItem
+            key={step.label}
+            className="flex flex-col items-stretch gap-2 sm:flex-1 sm:flex-row sm:items-center"
+          >
+            <FlowStep {...step} />
+            {i < steps.length - 1 ? <Arrow /> : null}
+          </RevealItem>
+        ))}
+      </Reveal>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useReducedMotion } from "framer-motion";
 import {
   Bar,
   BarChart,
@@ -52,6 +53,7 @@ function PerClassTooltip({ active, payload }: TooltipProps<number, string>) {
  * `metrics.json` → `per_class`; `rows` is built by `toClassRows`.
  */
 export function PerClassChart({ rows }: { rows: ClassRow[] }) {
+  const reduceMotion = useReducedMotion() ?? false;
   return (
     <ResponsiveContainer width="100%" height={280}>
       <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
@@ -75,7 +77,7 @@ export function PerClassChart({ rows }: { rows: ClassRow[] }) {
           cursor={{ fill: "rgba(124,92,255,0.08)" }}
           content={<PerClassTooltip />}
         />
-        <Bar dataKey="f1" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+        <Bar dataKey="f1" radius={[3, 3, 0, 0]} isAnimationActive={!reduceMotion}>
           {rows.map((r) => (
             <Cell key={r.letter} fill={r.f1 >= HIGH_F1 ? ACCENT_LOW : ACCENT} />
           ))}

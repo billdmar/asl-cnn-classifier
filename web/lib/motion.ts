@@ -28,13 +28,18 @@ export const transition: Transition = { duration: DUR.base, ease: EASE_OUT };
 export const transitionFast: Transition = { duration: DUR.fast, ease: EASE_OUT };
 
 /**
- * Scroll/entrance reveal: fade in while sliding up a few px. Animates only
- * `opacity` + `transform` (translateY) — never the element's box, so layout is
- * unaffected (zero CLS).
+ * Scroll/entrance reveal: slide up a few px. **Transform-only** (translateY) —
+ * deliberately NOT animating opacity. This is the same `rise-up` discipline the
+ * hero's LCP heading uses: the content paints fully opaque from the first frame,
+ * so (a) it never contributes CLS, (b) framer's SSR prerender bakes opaque
+ * (not opacity:0) styles into the static export, protecting LCP, and (c) axe
+ * never catches bulk text mid-fade at sub-AA contrast. The slide still reads as
+ * a premium reveal; the fade is reserved for discrete, lazy-mounted moments via
+ * {@link scaleIn} (which axe never scans, since those panels mount on demand).
  */
 export const revealVariants: Variants = {
-  hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0, transition },
+  hidden: { y: 12 },
+  visible: { y: 0, transition },
 };
 
 /**
@@ -48,10 +53,10 @@ export function staggerContainer(stagger = 0.06): Variants {
   };
 }
 
-/** Child variant for a {@link staggerContainer}. Same motion as a single reveal. */
+/** Child variant for a {@link staggerContainer}. Transform-only, like {@link revealVariants}. */
 export const staggerItem: Variants = {
-  hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0, transition },
+  hidden: { y: 12 },
+  visible: { y: 0, transition },
 };
 
 /** Scale-in for emphasis (predicted letter, badges). Transform/opacity only. */

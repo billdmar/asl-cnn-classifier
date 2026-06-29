@@ -1,3 +1,4 @@
+import { Reveal, RevealItem } from "@/components/ui/reveal";
 import { Badge } from "@/components/ui/badge";
 
 interface StackGroup {
@@ -40,17 +41,25 @@ const STACK: ReadonlyArray<StackGroup> = [
 
 export function TechStack() {
   return (
-    <dl className="grid gap-6 sm:grid-cols-2">
+    // Stagger each group in on scroll; each lifts subtly on hover (CSS
+    // transform-only, so it composes with the reveal's translate without CLS).
+    <Reveal stagger as="dl" className="grid gap-6 sm:grid-cols-2">
       {STACK.map((group) => (
-        <div key={group.heading}>
+        // RevealItem renders the single <div> group that the dl directly
+        // contains (axe `dlitem`/`definition-list` require dt/dd to live in a
+        // bare <div> child of the <dl> — no extra nesting). Hover-lift on it.
+        <RevealItem
+          key={group.heading}
+          className="transition-transform duration-150 ease-out hover:-translate-y-0.5"
+        >
           <dt className="text-sm font-semibold text-fg">{group.heading}</dt>
           <dd className="mt-3 flex flex-wrap gap-2">
             {group.items.map((item) => (
               <Badge key={item}>{item}</Badge>
             ))}
           </dd>
-        </div>
+        </RevealItem>
       ))}
-    </dl>
+    </Reveal>
   );
 }
