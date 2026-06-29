@@ -50,10 +50,24 @@ const config: Config = {
           "0%": { transform: "translateY(8px)" },
           "100%": { transform: "translateY(0)" },
         },
+        // Loading shimmer sweep — animates background-position (compositor-only,
+        // no layout). Pair with a gradient background on the skeleton element.
+        shimmer: {
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
+        },
+        // Slow accent-gradient pan for decorative gradient text. Also
+        // background-position only; pair with `.bg-pan` (background-size: 200%).
+        "gradient-pan": {
+          "0%, 100%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.4s ease-out both",
         "rise-up": "rise-up 0.4s ease-out both",
+        shimmer: "shimmer 1.6s linear infinite",
+        "gradient-pan": "gradient-pan 8s ease-in-out infinite",
       },
     },
   },
