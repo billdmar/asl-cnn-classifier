@@ -54,6 +54,9 @@ Product niceties:
   is a generic static card — per-result previews need a server this static
   deploy intentionally doesn't have).
 - **Deploy provenance** — the footer shows the live commit SHA + build date.
+- **Dark / light theme** — a header toggle (default dark) persisted to
+  localStorage with a no-flash pre-paint script; the light palette is WCAG-AA
+  contrast-verified and gated by axe in **both** themes.
 
 ### Legacy Gradio demo
 

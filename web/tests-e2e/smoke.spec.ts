@@ -23,10 +23,22 @@ test.describe("landing page", () => {
     await expect(page.getByRole("contentinfo")).toBeVisible();
 
     // Dark theme actually applied (not a flash of unstyled / white page).
-    const bodyBg = await page.evaluate(
+    await page.evaluate(() =>
+      document.documentElement.setAttribute("data-theme", "dark"),
+    );
+    const darkBg = await page.evaluate(
       () => getComputedStyle(document.body).backgroundColor,
     );
-    expect(bodyBg).toBe("rgb(10, 10, 15)");
+    expect(darkBg).toBe("rgb(10, 10, 15)");
+
+    // Light theme repaints the page bg white (proves the palette swap is live).
+    await page.evaluate(() =>
+      document.documentElement.setAttribute("data-theme", "light"),
+    );
+    const lightBg = await page.evaluate(
+      () => getComputedStyle(document.body).backgroundColor,
+    );
+    expect(lightBg).toBe("rgb(255, 255, 255)");
   });
 
   test("nav anchors resolve to on-page sections", async ({ page }) => {

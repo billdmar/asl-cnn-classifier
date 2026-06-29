@@ -27,7 +27,17 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* No-FOUC theme init: set data-theme before first paint from the saved
+            preference (default dark = current look). suppressHydrationWarning on
+            <html> covers the attribute this adds before React hydrates. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme');if(t!=='light'&&t!=='dark'){t='dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`,
+          }}
+        />
+      </head>
       <body>
         {/* Keyboard/screen-reader users can jump straight to the content. */}
         <a

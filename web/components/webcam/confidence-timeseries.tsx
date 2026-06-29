@@ -10,7 +10,7 @@ import {
 
 import type { ConfidencePoint } from "@/components/webcam/smoothing";
 
-const ACCENT = "#2dd4bf";
+const ACCENT = "rgb(var(--chart-accent-2))";
 
 /**
  * Live sparkline of the smoothed top-class confidence over recent frames. Makes
