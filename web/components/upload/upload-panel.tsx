@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle, ImageUp, Loader2, UploadCloud } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { interpret, type ConfidenceVerdict } from "@/lib/confidence";
+import { revealVariants, scaleIn, transition } from "@/lib/motion";
 import {
   cropToCanvas,
   detectHandInImage,
@@ -68,6 +70,8 @@ export function UploadPanel() {
   const [showGradcam, setShowGradcam] = useState(false);
   /** Data URL of the cropped hand region actually classified (transparency). */
   const [cropPreview, setCropPreview] = useState<string | null>(null);
+
+  const reduceMotion = useReducedMotion();
 
   const inputRef = useRef<HTMLInputElement>(null);
   // Track the most recent object URL so we can revoke the previous one.
@@ -250,9 +254,9 @@ export function UploadPanel() {
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           className={cn(
-            "flex min-h-[16rem] cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-6 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg",
+            "flex min-h-[16rem] cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-6 text-center transition-[colors,transform] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg",
             dragActive
-              ? "border-accent bg-accent/10"
+              ? "border-accent bg-accent/10 motion-safe:scale-[1.01]"
               : "border-border bg-bg-card hover:border-accent/50",
             isLoading && "pointer-events-none opacity-60",
           )}
@@ -285,54 +289,94 @@ export function UploadPanel() {
           />
         </div>
 
-        {/* Result / status panel. */}
+        {/* Result / status panel. Each status animates its own entrance (a
+            transform-only reveal); the panel has a fixed min-height so only one
+            state shows at a time with no layout shift. We deliberately do NOT
+            wrap this in AnimatePresence `mode="wait"` — the sequential
+            exit-then-enter handoff stalled the state swap under automated
+            interaction (the e2e example-classify test). Under reduced motion the
+            variants are dropped so blocks swap instantly. */}
         <Card>
           <CardContent className="flex min-h-[16rem] flex-col justify-center p-6">
-            {status === "idle" && (
-              <div className="flex flex-col items-center gap-2 text-center">
-                <ImageUp className="h-8 w-8 text-fg-subtle" aria-hidden="true" />
-                <p className="text-sm text-fg-muted">Your prediction will appear here.</p>
-              </div>
-            )}
+            <>
+              {status === "idle" && (
+                <motion.div
+                  key="idle"
+                  className="flex flex-col items-center gap-2 text-center"
+                  variants={reduceMotion ? undefined : revealVariants}
+                  initial={reduceMotion ? false : "hidden"}
+                  animate={reduceMotion ? false : "visible"}
+                  transition={transition}
+                >
+                  <ImageUp className="h-8 w-8 text-fg-subtle" aria-hidden="true" />
+                  <p className="text-sm text-fg-muted">
+                    Your prediction will appear here.
+                  </p>
+                </motion.div>
+              )}
 
-            {isLoading && (
-              <div
-                className="flex flex-col items-center gap-3 text-center"
-                role="status"
-                aria-live="polite"
-              >
-                <Loader2
-                  className="h-8 w-8 animate-spin text-accent"
-                  aria-hidden="true"
-                />
-                <p className="text-sm text-fg-muted">
-                  Warming up the model and classifying…
-                </p>
-              </div>
-            )}
+              {isLoading && (
+                <motion.div
+                  key="loading"
+                  className="flex flex-col items-center gap-3 text-center"
+                  role="status"
+                  aria-live="polite"
+                  variants={reduceMotion ? undefined : revealVariants}
+                  initial={reduceMotion ? false : "hidden"}
+                  animate={reduceMotion ? false : "visible"}
+                  transition={transition}
+                >
+                  <Loader2
+                    className="h-8 w-8 animate-spin text-accent"
+                    aria-hidden="true"
+                  />
+                  <p className="text-sm text-fg-muted">
+                    Warming up the model and classifying…
+                  </p>
+                </motion.div>
+              )}
 
-            {status === "error" && error && (
-              <div className="flex flex-col items-center gap-3 text-center" role="alert">
-                <AlertCircle className="h-8 w-8 text-amber-500" aria-hidden="true" />
-                <p className="text-sm text-fg">{error}</p>
-              </div>
-            )}
+              {status === "error" && error && (
+                <motion.div
+                  key="error"
+                  className="flex flex-col items-center gap-3 text-center"
+                  role="alert"
+                  variants={reduceMotion ? undefined : revealVariants}
+                  initial={reduceMotion ? false : "hidden"}
+                  animate={reduceMotion ? false : "visible"}
+                  transition={transition}
+                >
+                  <AlertCircle className="h-8 w-8 text-amber-500" aria-hidden="true" />
+                  <p className="text-sm text-fg">{error}</p>
+                </motion.div>
+              )}
 
-            {status === "done" && outcome && (
-              <div className="flex flex-col gap-4" aria-live="polite">
+              {status === "done" && outcome && (
+                <motion.div
+                  key="done"
+                  className="flex flex-col gap-4"
+                  aria-live="polite"
+                  variants={reduceMotion ? undefined : revealVariants}
+                  initial={reduceMotion ? false : "hidden"}
+                  animate={reduceMotion ? false : "visible"}
+                  transition={transition}
+                >
                 <div className="flex items-baseline justify-between gap-3">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-fg-subtle">
                       Predicted
                     </p>
-                    <p
+                    <motion.p
                       className={cn(
                         "font-mono text-5xl font-bold leading-none",
                         outcome.verdict.unsure ? "text-amber-400" : "text-fg",
                       )}
+                      variants={reduceMotion ? undefined : scaleIn}
+                      initial={reduceMotion ? false : "hidden"}
+                      animate={reduceMotion ? false : "visible"}
                     >
                       {outcome.result.top.label}
-                    </p>
+                    </motion.p>
                   </div>
                   {trueLabel && (
                     <p className="text-right text-xs text-fg-muted">
@@ -407,8 +451,9 @@ export function UploadPanel() {
                     )}
                   </div>
                 )}
-              </div>
-            )}
+                </motion.div>
+              )}
+            </>
           </CardContent>
         </Card>
       </div>
@@ -426,7 +471,11 @@ export function UploadPanel() {
                 onClick={() => handleExample(example.src, example.label)}
                 disabled={isLoading}
                 aria-label={`Classify example image for the letter ${example.label}`}
-                className="group flex flex-col items-center gap-1 rounded-lg border border-border bg-bg-card p-2 transition-colors hover:border-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:cursor-not-allowed disabled:opacity-50"
+                // CSS hover-lift + tap (transform-only, reduced-motion safe via
+                // motion-safe:). NOT framer whileHover — a JS hover transform
+                // keeps the element perpetually "unstable" and stalls
+                // click-actionability (it broke the e2e example-classify test).
+                className="group flex flex-col items-center gap-1 rounded-lg border border-border bg-bg-card p-2 transition-[colors,transform] duration-150 ease-out hover:border-accent/50 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img

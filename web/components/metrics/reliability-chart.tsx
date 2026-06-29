@@ -1,5 +1,6 @@
 "use client";
 
+import { useReducedMotion } from "framer-motion";
 import {
   CartesianGrid,
   Line,
@@ -66,6 +67,7 @@ function ReliabilityTooltip({ active, payload }: TooltipProps<number, string>) {
  * the held-out real test split with the trained MobileNetV2 checkpoint.
  */
 export function ReliabilityChart({ calibration }: { calibration: CalibrationData }) {
+  const reduceMotion = useReducedMotion() ?? false;
   const rows = toReliabilityRows(calibration.bins);
   const data: ChartPoint[] = rows.map((r) => ({
     x: r.midpoint,
@@ -115,7 +117,7 @@ export function ReliabilityChart({ calibration }: { calibration: CalibrationData
           strokeWidth={1.5}
           strokeDasharray="4 4"
           dot={false}
-          isAnimationActive={false}
+          isAnimationActive={!reduceMotion}
         />
         <Line
           type="monotone"
@@ -124,7 +126,7 @@ export function ReliabilityChart({ calibration }: { calibration: CalibrationData
           stroke={ACCENT}
           strokeWidth={2}
           dot={{ r: 3, fill: ACCENT }}
-          isAnimationActive={false}
+          isAnimationActive={!reduceMotion}
         />
       </LineChart>
     </ResponsiveContainer>

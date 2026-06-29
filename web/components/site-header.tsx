@@ -37,9 +37,12 @@ export function SiteHeader() {
       >
         <a
           href="#top"
-          className="flex items-center gap-2 rounded-md font-semibold text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          className="group flex items-center gap-2 rounded-md font-semibold text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
         >
-          <span aria-hidden="true" className="h-6 w-6 rounded-md bg-accent-gradient" />
+          <span
+            aria-hidden="true"
+            className="h-6 w-6 rounded-md bg-accent-gradient transition-transform group-hover:scale-110"
+          />
           ASL Classifier
         </a>
 
@@ -49,7 +52,7 @@ export function SiteHeader() {
               <li key={link.href}>
                 <a
                   href={link.href}
-                  className="rounded-md px-3 py-2 text-sm text-fg-muted transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                  className="rounded-md px-3 py-2 text-sm text-fg-muted underline decoration-accent decoration-2 underline-offset-8 decoration-transparent transition-colors hover:text-fg hover:decoration-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
                 >
                   {link.label}
                 </a>

@@ -24,6 +24,24 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+  /*
+   * The blanket rule above caps duration but an infinite animation would still
+   * busy-loop a single frame forever. Fully stop the decorative looping
+   * animations (shimmer, gradient-pan) for reduced-motion users.
+   */
+  .animate-shimmer,
+  .animate-gradient-pan {
+    animation: none !important;
+  }
+}
+
+/*
+ * Helper for `animate-gradient-pan`: the gradient needs to be larger than its
+ * box so panning the background-position actually moves it. Opt in by adding
+ * `bg-pan` alongside a gradient background + `animate-gradient-pan`.
+ */
+.bg-pan {
+  background-size: 200% 200%;
 }
 
 /* Thin accent scrollbar for the dark aesthetic. */

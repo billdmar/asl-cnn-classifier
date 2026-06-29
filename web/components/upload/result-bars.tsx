@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from "framer-motion";
 
 import type { Prediction } from "@/lib/inference";
 import { formatPct } from "@/lib/confidence";
+import { staggerContainer, staggerItem } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 interface ResultBarsProps {
@@ -27,13 +28,23 @@ export function ResultBars({ ranked, count = 5, unsure = false }: ResultBarsProp
   const top = ranked.slice(0, count);
 
   return (
-    <ul className="flex flex-col gap-2" aria-label="Top predictions">
+    <motion.ul
+      className="flex flex-col gap-2"
+      aria-label="Top predictions"
+      variants={reduceMotion ? undefined : staggerContainer(0.05)}
+      initial={reduceMotion ? false : "hidden"}
+      animate={reduceMotion ? false : "visible"}
+    >
       {top.map((prediction, rank) => {
         const isTop = rank === 0;
         const amber = isTop && unsure;
         const widthPct = `${Math.max(prediction.prob * 100, 1.5)}%`;
         return (
-          <li key={prediction.index} className="flex items-center gap-3">
+          <motion.li
+            key={prediction.index}
+            className="flex items-center gap-3"
+            variants={reduceMotion ? undefined : staggerItem}
+          >
             <span className="w-5 shrink-0 text-center font-mono text-sm font-semibold text-fg">
               {prediction.label}
             </span>
@@ -58,9 +69,9 @@ export function ResultBars({ ranked, count = 5, unsure = false }: ResultBarsProp
             >
               {formatPct(prediction.prob)}
             </span>
-          </li>
+          </motion.li>
         );
       })}
-    </ul>
+    </motion.ul>
   );
 }

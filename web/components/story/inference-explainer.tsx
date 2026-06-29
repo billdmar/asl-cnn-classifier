@@ -1,6 +1,7 @@
 import { Cpu, ShieldCheck, Server, Zap } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+import { Reveal, RevealItem } from "@/components/ui/reveal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface ExplainerPoint {
@@ -34,23 +35,25 @@ const POINTS: ReadonlyArray<ExplainerPoint> = [
 
 export function InferenceExplainer() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <Reveal stagger className="grid gap-4 sm:grid-cols-2">
       {POINTS.map((point) => {
         const Icon = point.icon;
         return (
-          <Card key={point.title}>
-            <CardHeader className="flex-row items-center gap-3 space-y-0">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-accent/30 bg-accent/10">
-                <Icon className="h-5 w-5 text-accent" aria-hidden="true" />
-              </span>
-              <CardTitle className="text-base">{point.title}</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm">
-              <p>{point.body}</p>
-            </CardContent>
-          </Card>
+          <RevealItem key={point.title} className="h-full">
+            <Card>
+              <CardHeader className="flex-row items-center gap-3 space-y-0">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-accent/30 bg-accent/10">
+                  <Icon className="h-5 w-5 text-accent" aria-hidden="true" />
+                </span>
+                <CardTitle className="text-base">{point.title}</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm">
+                <p>{point.body}</p>
+              </CardContent>
+            </Card>
+          </RevealItem>
         );
       })}
-    </div>
+    </Reveal>
   );
 }

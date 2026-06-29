@@ -21,7 +21,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Camera, CameraOff, ShieldCheck, VideoOff } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfidenceBars } from "@/components/webcam/confidence-bars";
 import { ConfidenceTimeseries } from "@/components/webcam/confidence-timeseries";
@@ -41,6 +41,7 @@ import {
   type HoldState,
 } from "@/components/webcam/word-builder";
 import { interpret, type ConfidenceVerdict } from "@/lib/confidence";
+import { scaleIn, tapScale } from "@/lib/motion";
 import { cropBoxFromLandmarks, cropToCanvas, type CropBox } from "@/lib/handcrop";
 import { CLASS_NAMES } from "@/lib/labels";
 import { IMAGE_SIZE } from "@/lib/preprocess";
@@ -386,18 +387,28 @@ export function WebcamPanel() {
 
           <div className="flex items-center gap-3">
             {isActive ? (
-              <Button variant="outline" onClick={stopCamera}>
+              // motion.button (not <Button>) so the camera toggle gets a subtle
+              // tap press; keeps native button semantics + shared button styles.
+              <motion.button
+                type="button"
+                whileTap={reduceMotion ? undefined : tapScale}
+                onClick={stopCamera}
+                className={buttonVariants({ variant: "outline" })}
+              >
                 <CameraOff className="h-4 w-4" aria-hidden="true" />
                 Stop camera
-              </Button>
+              </motion.button>
             ) : (
-              <Button
+              <motion.button
+                type="button"
+                whileTap={reduceMotion ? undefined : tapScale}
                 onClick={() => void startCamera()}
                 disabled={cameraState === "requesting"}
+                className={buttonVariants()}
               >
                 <Camera className="h-4 w-4" aria-hidden="true" />
                 {cameraState === "requesting" ? "Requesting…" : "Start camera"}
-              </Button>
+              </motion.button>
             )}
             {warmStatus === "warming" && (
               <div className="flex flex-col gap-1" role="status" aria-live="polite">
@@ -427,7 +438,14 @@ export function WebcamPanel() {
           <div
             className={cn(
               "flex min-h-[7rem] flex-col items-center justify-center rounded-lg border p-4 text-center",
-              showUnsure ? "border-amber-400/40 bg-amber-400/5" : "border-border bg-bg",
+              // Subtle accent glow fades in for a confident letter (box-shadow
+              // only — no reflow/CLS). Neutralized under reduced motion.
+              !reduceMotion && "transition-shadow duration-300",
+              showUnsure
+                ? "border-amber-400/40 bg-amber-400/5"
+                : bigLetter
+                  ? "border-accent/40 bg-bg shadow-[0_0_24px_-4px_theme(colors.accent/35%)]"
+                  : "border-border bg-bg",
             )}
             aria-live="polite"
           >
@@ -439,9 +457,9 @@ export function WebcamPanel() {
             ) : bigLetter ? (
               <motion.span
                 key={bigLetter}
-                initial={reduceMotion ? false : { scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={reduceMotion ? { duration: 0 } : { duration: 0.2 }}
+                variants={scaleIn}
+                initial={reduceMotion ? false : "hidden"}
+                animate="visible"
                 className="bg-accent-gradient bg-clip-text font-mono text-6xl font-bold text-transparent"
               >
                 {bigLetter}

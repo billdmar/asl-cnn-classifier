@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Reveal } from "@/components/ui/reveal";
 import {
   bestValEpoch,
   fetchCalibration,
@@ -152,6 +153,7 @@ export function MetricsDashboard() {
 
   return (
     <div className="flex flex-col gap-8">
+      <Reveal>
       <Card>
         <CardHeader>
           <CardTitle>Cross-dataset generalization — the honest number</CardTitle>
@@ -209,8 +211,10 @@ export function MetricsDashboard() {
           <p className="mt-3 text-xs text-fg-subtle">{realworld.note}</p>
         </CardContent>
       </Card>
+      </Reveal>
 
       {realworld.confusion_matrix.length > 0 ? (
+        <Reveal>
         <Card>
           <CardHeader>
             <CardTitle>Where it gets confused (cross-dataset)</CardTitle>
@@ -230,11 +234,12 @@ export function MetricsDashboard() {
             </div>
           </CardContent>
         </Card>
+        </Reveal>
       ) : null}
 
       <StatCards stats={stats} />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <Reveal as="div" className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Per-class F1 score</CardTitle>
@@ -339,7 +344,7 @@ export function MetricsDashboard() {
             </SrOnly>
           </CardContent>
         </Card>
-      </div>
+      </Reveal>
 
       <p className="text-xs text-fg-subtle">
         All figures above are {SOURCE}. Checkpoint:{" "}

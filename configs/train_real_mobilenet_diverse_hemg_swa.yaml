@@ -1,0 +1,58 @@
+# Training configuration — 3-SOURCE diverse fine-tune + SWA + label smoothing.
+#
+# Identical recipe to the DEPLOYED D3 config (train_real_mobilenet_diverse_hemg
+# .yaml) but with two generalization levers layered on, both config-gated so the
+# base training path stays byte-identical when they are absent:
+#   * label_smoothing 0.1  — softens one-hot targets (better calibration/general).
+#   * SWA               — average the last ~tail of epochs at a constant LR, then
+#                          recompute BN stats; the averaged model is the deliverable.
+#
+# This is the single honest, gated accuracy experiment for the product-overhaul
+# round. DECISION RULE: promote to the deployed checkpoint ONLY if BOTH the
+# cross-dataset 26-class accuracy beats 55.5% AND A-Y beats 59.8%, each by >=+2pt
+# (clear of the ±~3.5pt n=712 noise band) with no strong-class regression. Else
+# record the negative in docs/EXPERIMENT_swa_label_smoothing.md and keep the
+# deployed model. Separate checkpoint dir — never clobbers the baseline.
+
+# Data — union of all three vetted training sources (same as deployed D3).
+data_dir:
+  - data/asl_real
+  - data/asl_diverse
+  - data/asl_hemg
+image_size: 128
+train_frac: 0.70
+val_frac: 0.15
+test_frac: 0.15
+
+# Model
+arch: mobilenet_v2
+num_classes: 26
+pretrained: true
+
+# Optimization (deployed recipe)
+batch_size: 64
+num_epochs: 12
+learning_rate: 0.001
+weight_decay: 0.0001
+optimizer: adamw
+lr_scheduler: cosine
+warmup_epochs: 3
+
+# Training behavior
+seed: 42
+num_workers: 4
+amp: false
+early_stopping_patience: 5
+device: auto
+augmentation: standard
+
+# --- Generalization levers under test (the only delta vs the deployed config) ---
+label_smoothing: 0.1
+use_swa: true
+# Average the last 4 of 12 epochs (the fine-tune tail, after the 3-epoch warmup).
+swa_start_epoch: 9
+swa_lr: 0.0001
+
+# Output — SEPARATE dir; never clobber the deployed baseline.
+checkpoint_dir: artifacts/checkpoints_diverse_hemg_swa
+tensorboard_dir: artifacts/runs

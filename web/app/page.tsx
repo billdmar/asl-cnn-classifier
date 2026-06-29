@@ -3,6 +3,7 @@ import { Hero } from "@/components/hero";
 import { LazyVisible } from "@/components/lazy-visible";
 import { SiteHeader } from "@/components/site-header";
 import { SkeletonCard } from "@/components/skeleton-card";
+import { Reveal } from "@/components/ui/reveal";
 // Heavy, below-the-fold panels (onnxruntime-web, recharts, @mediapipe) are
 // code-split via next/dynamic with ssr:false so their JS stays out of the
 // initial bundle. They are further wrapped in <LazyVisible> so the chunks and
@@ -21,12 +22,17 @@ interface SectionShellProps {
 function SectionShell({ id, title, blurb, children }: SectionShellProps) {
   return (
     <section id={id} aria-labelledby={`${id}-heading`} className="scroll-mt-24">
-      <div className="mb-6">
+      {/* Reveal ONLY the heading block. The content slot holds the interactive
+          panels (webcam/upload/metrics) — wrapping those in a reveal leaves
+          their controls in a transient transform state, which stalls
+          click-actionability for automated interaction (it broke the e2e
+          example-classify test). The panels already enter via LazyVisible. */}
+      <Reveal className="mb-6">
         <h2 id={`${id}-heading`} className="text-2xl font-semibold tracking-tight">
           {title}
         </h2>
         <p className="mt-2 max-w-2xl text-pretty text-fg-muted">{blurb}</p>
-      </div>
+      </Reveal>
       {children}
     </section>
   );

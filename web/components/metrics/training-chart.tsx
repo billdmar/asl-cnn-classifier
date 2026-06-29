@@ -1,5 +1,6 @@
 "use client";
 
+import { useReducedMotion } from "framer-motion";
 import {
   CartesianGrid,
   Legend,
@@ -47,6 +48,7 @@ function TrainingTooltip({ active, payload, label }: TooltipProps<number, string
  * `training_history.json` (`train_acc` / `val_acc` per epoch).
  */
 export function TrainingChart({ history }: { history: TrainingHistory }) {
+  const reduceMotion = useReducedMotion() ?? false;
   const data: CurvePoint[] = history.map((e) => ({
     epoch: e.epoch,
     trainAcc: e.train_acc,
@@ -80,7 +82,7 @@ export function TrainingChart({ history }: { history: TrainingHistory }) {
           stroke={ACCENT}
           strokeWidth={2}
           dot={false}
-          isAnimationActive={false}
+          isAnimationActive={!reduceMotion}
         />
         <Line
           type="monotone"
@@ -89,7 +91,7 @@ export function TrainingChart({ history }: { history: TrainingHistory }) {
           stroke={ACCENT_2}
           strokeWidth={2}
           dot={false}
-          isAnimationActive={false}
+          isAnimationActive={!reduceMotion}
         />
       </LineChart>
     </ResponsiveContainer>

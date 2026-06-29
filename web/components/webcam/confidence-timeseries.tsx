@@ -1,5 +1,6 @@
 "use client";
 
+import { useReducedMotion } from "framer-motion";
 import {
   Area,
   AreaChart,
@@ -18,6 +19,7 @@ const ACCENT = "#2dd4bf";
  * the webcam panel (no extra inference — it reuses the smoothed result).
  */
 export function ConfidenceTimeseries({ points }: { points: ConfidencePoint[] }) {
+  const reduceMotion = useReducedMotion();
   const latest = points[points.length - 1];
   const summary = latest
     ? `Top prediction ${latest.label || "—"} confidence is ${(latest.prob * 100).toFixed(0)}% and trending across the last ${points.length} frames.`
@@ -36,7 +38,9 @@ export function ConfidenceTimeseries({ points }: { points: ConfidencePoint[] }) 
               fill={ACCENT}
               fillOpacity={0.18}
               strokeWidth={2}
-              isAnimationActive={false}
+              // Subtle line draw-in / fade, gated on reduced-motion.
+              isAnimationActive={!reduceMotion}
+              animationDuration={300}
               dot={false}
             />
           </AreaChart>

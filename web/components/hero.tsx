@@ -33,7 +33,7 @@ export function Hero() {
          */}
         <h1
           id="hero-heading"
-          className="mt-6 text-balance bg-accent-gradient bg-clip-text text-4xl font-bold leading-tight text-transparent sm:text-6xl"
+          className="mt-6 text-balance bg-accent-gradient bg-pan bg-clip-text text-4xl font-bold leading-tight text-transparent animate-gradient-pan sm:text-6xl"
         >
           Read sign language in your browser
         </h1>
@@ -44,13 +44,19 @@ export function Hero() {
         </p>
 
         <div className="mt-8 flex w-full animate-fade-up flex-col items-center gap-3 [animation-delay:240ms] sm:w-auto sm:flex-row">
-          <a href="#live" className="w-full sm:w-auto">
+          <a
+            href="#live"
+            className="w-full transition-transform hover:-translate-y-0.5 sm:w-auto"
+          >
             <Button size="lg" className="w-full sm:w-auto">
               Try the live demo
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Button>
           </a>
-          <a href="#upload" className="w-full sm:w-auto">
+          <a
+            href="#upload"
+            className="w-full transition-transform hover:-translate-y-0.5 sm:w-auto"
+          >
             <Button variant="outline" size="lg" className="w-full sm:w-auto">
               <Upload className="h-4 w-4" aria-hidden="true" />
               Upload an image

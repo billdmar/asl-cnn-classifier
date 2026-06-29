@@ -1,5 +1,6 @@
 import { ArrowRight } from "lucide-react";
 
+import { Reveal, RevealItem } from "@/components/ui/reveal";
 import type { ConfusedPair } from "@/lib/metrics";
 
 /**
@@ -8,10 +9,11 @@ import type { ConfusedPair } from "@/lib/metrics";
  */
 export function ConfusedPairs({ pairs }: { pairs: ConfusedPair[] }) {
   return (
-    <ol className="flex flex-col gap-2">
+    <Reveal as="ol" stagger className="flex flex-col gap-2">
       {pairs.map((p, i) => (
-        <li
+        <RevealItem
           key={`${p.true}-${p.pred}`}
+          as="li"
           className="flex items-center justify-between rounded-lg border border-border-subtle bg-bg-subtle px-3 py-2"
         >
           <span className="flex items-center gap-2 text-sm">
@@ -23,8 +25,8 @@ export function ConfusedPairs({ pairs }: { pairs: ConfusedPair[] }) {
           <span className="text-sm tabular-nums text-fg-muted">
             {p.count} {p.count === 1 ? "image" : "images"}
           </span>
-        </li>
+        </RevealItem>
       ))}
-    </ol>
+    </Reveal>
   );
 }
