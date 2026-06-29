@@ -540,8 +540,10 @@ def main() -> None:
     # save IT as the checkpoint — the averaged model is the SWA deliverable, so it
     # overwrites the per-epoch best regardless of val accuracy.
     if use_swa and swa_model is not None and swa_n_updates > 0:
-        print(f"SWA: recomputing BN stats over the train loader "
-              f"({swa_n_updates} averaged epoch(s)).")
+        print(
+            f"SWA: recomputing BN stats over the train loader "
+            f"({swa_n_updates} averaged epoch(s))."
+        )
         update_bn(train_loader, swa_model, device=device)
         swa_val_loss, swa_val_acc = run_epoch(
             swa_model,
@@ -553,9 +555,7 @@ def main() -> None:
             use_amp=use_amp,
             autocast_enabled=autocast_enabled,
         )
-        print(
-            f"SWA averaged model | val_loss {swa_val_loss:.4f} acc {swa_val_acc:.4f}"
-        )
+        print(f"SWA averaged model | val_loss {swa_val_loss:.4f} acc {swa_val_acc:.4f}")
         # AveragedModel wraps the net in `.module`; save the underlying state dict
         # so it loads into a plain build_model() net like every other checkpoint.
         torch.save(
