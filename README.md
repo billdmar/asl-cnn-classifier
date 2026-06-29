@@ -137,10 +137,13 @@ make install
 > then [`Hemg/sign_language_dataset`](https://huggingface.co/datasets/Hemg/sign_language_dataset)),
 > while preprocessing and inference-time tricks (crop, sketch-clean, augmentation,
 > per-class thresholds, TTA, temperature) were all measured and found *not* to
-> help — see [`docs/`](docs/) for the full honest investigation. Reproduce with
-> `make download-real && make download-diverse && make download-hemg &&
-> make check-overlap-hemg && make train-diverse-hemg && make eval-realworld-diverse-hemg`
-> (~50 min on Apple-Silicon MPS).
+> help — see [`docs/`](docs/) for the full honest investigation. Reproduce the
+> whole deployed checkpoint end-to-end with one command — **`make reproduce-deployed`**
+> (downloads the 3 sources + the held-out gate, verifies non-overlap, trains, and
+> evaluates; ~50 min on Apple-Silicon MPS). It chains
+> `download-real → download-diverse → download-hemg → download-crossval →
+> check-overlap-hemg → train-diverse-hemg → eval-realworld-diverse-hemg`, which you
+> can also run individually.
 
 | Metric | Value | Source |
 | --- | --- | --- |
@@ -233,6 +236,12 @@ accuracy. The deployed model is a MobileNetV2 trained on the **union of three
 public, credential-free Hugging Face datasets** and judged on a **fourth** it
 never trains on. Full pipeline from a fresh checkout (~50 min on Apple-Silicon
 MPS):
+
+```bash
+make reproduce-deployed     # one command — runs the whole pipeline below in order
+```
+
+…or step through it yourself (the individual targets `reproduce-deployed` chains):
 
 ```bash
 make download-real          # Marxulia (single signer, plain bg) — A–Z
