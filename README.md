@@ -57,6 +57,11 @@ Product niceties:
 - **Dark / light theme** — a header toggle (default dark) persisted to
   localStorage with a no-flash pre-paint script; the light palette is WCAG-AA
   contrast-verified and gated by axe in **both** themes.
+- **Installable + offline PWA** — a web manifest + maskable icons make it
+  installable to the home screen; a service worker caches the app shell (and
+  MediaPipe assets) so it runs offline after the first visit. The ~9 MB model is
+  served from IndexedDB (the SW deliberately doesn't touch `/model`). Plus
+  sitemap / robots / schema.org JSON-LD with the honest accuracy numbers.
 
 ### Legacy Gradio demo
 
