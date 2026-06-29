@@ -16,6 +16,8 @@ import { classifyImage, type InferenceResult } from "@/lib/inference";
 import { IMAGE_SIZE } from "@/lib/preprocess";
 import { cn } from "@/lib/utils";
 
+import { ShareButton } from "@/components/share-button";
+
 import { ResultBars } from "./result-bars";
 
 /** Click-to-try example images served from public/examples, with true labels. */
@@ -422,6 +424,8 @@ export function UploadPanel() {
                   count={5}
                   unsure={outcome.verdict.unsure}
                 />
+
+                <ShareButton result={outcome.result} className="self-start" />
 
                 {trueLabel && GRADCAM_LABELS.has(trueLabel) && (
                   <div className="border-t border-border-subtle pt-3">

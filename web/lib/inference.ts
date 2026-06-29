@@ -12,6 +12,11 @@
 
 import * as ort from "onnxruntime-web";
 import { CLASS_NAMES } from "./labels";
+import {
+  evictOtherVersions,
+  getCachedModel,
+  putCachedModel,
+} from "./model-cache";
 import { IMAGE_SIZE, preprocess, softmax } from "./preprocess";
 
 /** A single class prediction. */
@@ -128,16 +133,30 @@ export function getSession(
         ? ["webgpu", "wasm"]
         : ["wasm"];
     sessionPromise = (async () => {
-      // When a progress callback is given, stream the ~9 MB model ourselves so we
-      // can report download progress (ort.InferenceSession.create fetches the URL
-      // internally with no progress hook). Fall back to the URL form otherwise,
-      // or if streaming/Content-Length isn't available.
-      if (onProgress) {
-        const bytes = await fetchWithProgress(modelUrl, onProgress);
-        if (bytes) {
-          return ort.InferenceSession.create(bytes, { executionProviders });
-        }
+      // We stream the ~9 MB model ourselves (rather than letting
+      // ort.InferenceSession.create fetch the URL, which has no progress hook
+      // and no cache control) so we can BOTH report download progress AND back
+      // it with an IndexedDB cache — returning visitors skip the download
+      // entirely. This applies whether or not a progress callback is supplied
+      // (the upload path has no callback but still benefits from the cache).
+      // Cache version = build SHA, so a new deploy misses the old entry.
+      const version = process.env.NEXT_PUBLIC_BUILD_SHA || "dev";
+      const cached = await getCachedModel(modelUrl, version);
+      if (cached) {
+        onProgress?.(1);
+        return ort.InferenceSession.create(cached, { executionProviders });
       }
+      const bytes = await fetchWithProgress(modelUrl, onProgress);
+      if (bytes) {
+        // Best-effort: persist + reclaim old versions, but never let a cache
+        // failure delay or break the session creation.
+        void putCachedModel(modelUrl, version, bytes).then(() =>
+          evictOtherVersions(modelUrl, version),
+        );
+        return ort.InferenceSession.create(bytes, { executionProviders });
+      }
+      // Streaming unavailable (no Content-Length / ReadableStream) — let ORT
+      // fetch the URL directly as a last resort.
       return ort.InferenceSession.create(modelUrl, { executionProviders });
     })();
   }
@@ -151,7 +170,7 @@ export function getSession(
  */
 async function fetchWithProgress(
   url: string,
-  onProgress: (fraction: number) => void,
+  onProgress?: (fraction: number) => void,
 ): Promise<Uint8Array | null> {
   try {
     const res = await fetch(url);
@@ -166,10 +185,10 @@ async function fetchWithProgress(
       if (value) {
         chunks.push(value);
         received += value.length;
-        if (total > 0) onProgress(Math.min(1, received / total));
+        if (total > 0) onProgress?.(Math.min(1, received / total));
       }
     }
-    onProgress(1);
+    onProgress?.(1);
     const out = new Uint8Array(received);
     let offset = 0;
     for (const c of chunks) {

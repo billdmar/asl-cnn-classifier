@@ -34,4 +34,14 @@ test.describe("accessibility", () => {
       violations.map((v) => `${v.id}: ${v.help}`).join("\n"),
     ).toEqual([]);
   });
+
+  test("result page (empty state) has no serious/critical axe violations", async ({
+    page,
+  }) => {
+    const violations = await scan(page, "/result");
+    expect(
+      violations,
+      violations.map((v) => `${v.id}: ${v.help}`).join("\n"),
+    ).toEqual([]);
+  });
 });
