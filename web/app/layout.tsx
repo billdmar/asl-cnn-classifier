@@ -1,5 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+
+import { ServiceWorkerRegister } from "@/components/service-worker-register";
+import { buildJsonLd } from "@/lib/structured-data";
 
 const TITLE = "ASL Classifier — in-browser, real-time";
 const DESCRIPTION =
@@ -23,6 +26,10 @@ export const metadata: Metadata = {
   },
 };
 
+// Next 15 moved themeColor to the viewport export. Matches the dark default
+// (and the manifest's theme_color) so the browser chrome tints to the brand.
+export const viewport: Viewport = { themeColor: "#0a0a0f" };
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -37,6 +44,11 @@ export default function RootLayout({
             __html: `(function(){try{var t=localStorage.getItem('theme');if(t!=='light'&&t!=='dark'){t='dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`,
           }}
         />
+        {/* schema.org WebApplication structured data (static inline JSON-LD). */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(buildJsonLd()) }}
+        />
       </head>
       <body>
         {/* Keyboard/screen-reader users can jump straight to the content. */}
@@ -47,6 +59,9 @@ export default function RootLayout({
           Skip to main content
         </a>
         {children}
+        {/* Registers the offline service worker (prod hosts only; skips localhost
+            so e2e/Lighthouse run on a clean SW-free origin). */}
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
