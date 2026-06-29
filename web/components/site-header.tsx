@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Github } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Github, HelpCircle } from "lucide-react";
 
+import { KeyboardHelpDialog } from "@/components/keyboard-help-dialog";
+import { useKeyboardShortcuts } from "@/lib/use-keyboard-shortcuts";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
@@ -16,6 +18,7 @@ const REPO_URL = "https://github.com/billdmar/asl-cnn-classifier";
 
 export function SiteHeader() {
   const [scrolled, setScrolled] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -23,6 +26,15 @@ export function SiteHeader() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  // The header is global across pages, so it owns the "?" → help wiring. The
+  // camera/copy/reset/share shortcuts are wired into the webcam panel during
+  // integration. Memoized so the keydown listener isn't re-bound each render.
+  const shortcutHandlers = useMemo(
+    () => ({ help: () => setHelpOpen(true) }),
+    [],
+  );
+  useKeyboardShortcuts(shortcutHandlers);
 
   return (
     <header
@@ -59,6 +71,14 @@ export function SiteHeader() {
               </li>
             ))}
           </ul>
+          <button
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            aria-label="Keyboard shortcuts"
+            className="flex h-9 w-9 items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-bg-card hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          >
+            <HelpCircle className="h-5 w-5" aria-hidden="true" />
+          </button>
           <a
             href={REPO_URL}
             target="_blank"
@@ -70,6 +90,8 @@ export function SiteHeader() {
           </a>
         </div>
       </nav>
+
+      <KeyboardHelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
     </header>
   );
 }

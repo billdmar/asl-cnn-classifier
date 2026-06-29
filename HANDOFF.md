@@ -1,9 +1,36 @@
 # HANDOFF — ASL CNN Classifier
 
-_Last updated: 2026-06-28. Branch: `feat/product-overhaul-round` (off `main` @ `b142e40`);
-4 commits, all gates green, awaiting user push + PR._
+_Last updated: 2026-06-29. Branch: `feat/web-product-features` (off `main` @ `34e5932`);
+4 commits, all gates green locally, awaiting user push + PR._
 
-## ✅ THIS ROUND — product-overhaul, DONE (both tracks)
+## ✅ LATEST ROUND — web product features, DONE
+Branch `feat/web-product-features` (the prior product-overhaul round merged as PR #19).
+Four static-export web features, built by parallel agent teams (disjoint file ownership),
+all gates green. **Next action: user pushes → I open the PR → review → merge → `vercel --prod`.**
+
+- **IndexedDB model cache + slow-network resilience** (Stream A) — ~9 MB model cached keyed by
+  build SHA; repeat visits zero-refetch; 12 s slow-load hint + retry. Both webcam AND upload
+  paths cache. Best-effort/SSR-safe. Doc: `docs/EXPERIMENT_model_caching.md`.
+- **Shareable result permalinks** (Stream C) — base64url hash → `/result` renders the letter
+  client-side; ShareButton (navigator.share→clipboard). Static OG is ONE generic card (honest:
+  per-result preview needs a server we lack).
+- **Keyboard shortcuts + help dialog** (Stream B) — Space/C/R/S/?; native `<dialog>` (axe-clean).
+- **Deploy-freshness footer** (Stream D) — commit SHA + build date baked at build time.
+
+Gates: tsc strict, eslint, **121 unit tests** (was 73; +48), static build (now exports `/result`),
+**18 Playwright e2e** (incl. cache no-refetch, dialog-open axe, /result axe), Lighthouse median
+**home perf 0.99 / a11y 0.90, result perf 0.95 / a11y 0.98** (all ≥0.90), on system Chrome.
+Two integration fixes worth remembering: (1) caching had to be lifted OUT of the `onProgress`
+gate so the upload path (no progress callback) also caches — else the reload e2e refetched;
+(2) `text-accent` on `bg-bg-card` is 4.24:1 (under AA) — `/result` links use `text-fg` + accent
+underline instead. Accuracy remains CLOSED — this round adds zero accuracy by design.
+
+Lighthouse-on-`/result` gotcha: static export emits `out/result.html` (not `result/index.html`),
+so `lighthouserc.json` lists `http://localhost/result.html`.
+
+---
+
+## Earlier round — product-overhaul, MERGED as PR #19 (both tracks)
 Branch `feat/product-overhaul-round`. The two-track round below was executed; nothing is
 left to build. **Next action: user pushes the branch, then I open the PR (CI is green
 locally) → review → merge → `vercel --prod`.**

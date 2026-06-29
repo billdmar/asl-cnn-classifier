@@ -47,6 +47,8 @@ import { CLASS_NAMES } from "@/lib/labels";
 import { IMAGE_SIZE } from "@/lib/preprocess";
 import type { InferenceResult } from "@/lib/inference";
 import { useClassifier } from "@/lib/use-classifier";
+import { useKeyboardShortcuts } from "@/lib/use-keyboard-shortcuts";
+import { ShareButton, buildShareUrl, shareResult } from "@/components/share-button";
 import { cn } from "@/lib/utils";
 
 /** Camera lifecycle states, each with distinct UI. */
@@ -71,6 +73,7 @@ export function WebcamPanel() {
     status: warmStatus,
     error: warmError,
     progress: warmProgress,
+    slow: warmSlow,
     warmUp,
     classify,
   } = useClassifier();
@@ -334,6 +337,24 @@ export function WebcamPanel() {
   // Clean teardown on unmount.
   useEffect(() => stopCamera, [stopCamera]);
 
+  // Keyboard shortcuts (mapping + help dialog live in Stream B's modules; the
+  // "?" help trigger is wired globally in the site header). Here we bind the
+  // panel-scoped actions to the existing callbacks. Space toggles the camera,
+  // C copies the spelled word, R resets it, S shares the current prediction.
+  useKeyboardShortcuts({
+    camera: () => {
+      if (cameraState === "active") stopCamera();
+      else void startCamera();
+    },
+    copy: () => {
+      if (word) void navigator.clipboard?.writeText(word);
+    },
+    reset: () => setWord(""),
+    share: () => {
+      if (result) void shareResult(buildShareUrl(result));
+    },
+  });
+
   const isActive = cameraState === "active";
   const showUnsure = verdict?.unsure ?? false;
   const bigLetter = verdict && !showUnsure ? verdict.top.label : null;
@@ -423,12 +444,38 @@ export function WebcamPanel() {
                     aria-hidden="true"
                   />
                 </div>
+                {warmSlow && (
+                  <div className="mt-1 flex flex-col gap-1">
+                    <span className="max-w-[16rem] text-pretty text-xs text-fg-subtle">
+                      Still loading the model… (first visit downloads ~9 MB; it&apos;s
+                      cached after).
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="self-start"
+                      onClick={warmUp}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
             {warmStatus === "error" && (
-              <span className="text-sm text-amber-400" role="status">
-                {warmError ?? "Model failed to load."}
-              </span>
+              <div className="flex flex-col gap-1" role="status" aria-live="polite">
+                <span className="text-sm text-amber-400">
+                  {warmError ?? "Model failed to load."}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="self-start"
+                  onClick={warmUp}
+                >
+                  Retry
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -472,6 +519,10 @@ export function WebcamPanel() {
           </div>
 
           {result && <ConfidenceBars ranked={result.ranked} unsure={showUnsure} />}
+
+          {result && (
+            <ShareButton result={result} className="self-start" />
+          )}
 
           {confHistory.length > 1 && (
             <ConfidenceTimeseries points={confHistory} />

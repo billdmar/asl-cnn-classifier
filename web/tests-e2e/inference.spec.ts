@@ -99,4 +99,33 @@ test.describe("in-browser inference", () => {
       timeout: 30_000,
     });
   });
+
+  test("second visit serves the model from the IndexedDB cache (no refetch)", async ({
+    page,
+  }) => {
+    // First visit: classify once so the model is fetched AND cached in IndexedDB.
+    await page.goto("/");
+    const classifyA = page.getByRole("button", {
+      name: /classify example image for the letter A/i,
+    });
+    await classifyA.click();
+    await expect(page.locator("#upload")).toContainText(/Predicted/i, {
+      timeout: 30_000,
+    });
+
+    // Reload (same browser context → IndexedDB persists). Count network hits to
+    // the model on the second run; the cache should serve it with zero refetch.
+    let modelFetches = 0;
+    page.on("request", (req) => {
+      if (req.url().includes("/model/model.onnx")) modelFetches += 1;
+    });
+    await page.reload();
+    await page.getByRole("button", {
+      name: /classify example image for the letter A/i,
+    }).click();
+    await expect(page.locator("#upload")).toContainText(/Predicted/i, {
+      timeout: 30_000,
+    });
+    expect(modelFetches).toBe(0);
+  });
 });
