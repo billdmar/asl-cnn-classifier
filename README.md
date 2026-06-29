@@ -42,6 +42,19 @@ labeled benchmark-vs-real-world. CI enforces TypeScript-strict, lint, unit +
 parity tests, Playwright E2E (including a real in-browser inference assertion),
 and a Lighthouse budget (performance 98 / accessibility 96, gated ≥90).
 
+Product niceties:
+
+- **Instant repeat visits** — the ~9 MB model is cached in IndexedDB (keyed by
+  build SHA), so after the first load it starts with no re-download; a slow first
+  load shows a "cached after this" hint with a retry.
+- **Keyboard shortcuts** — `Space` start/stop camera, `C` copy the spelled word,
+  `R` reset, `S` share, `?` for the help dialog.
+- **Shareable results** — share a prediction as a link; `/result` renders the
+  exact letter + probabilities client-side from the URL (the link-preview image
+  is a generic static card — per-result previews need a server this static
+  deploy intentionally doesn't have).
+- **Deploy provenance** — the footer shows the live commit SHA + build date.
+
 ### Legacy Gradio demo
 
 A [Gradio](https://gradio.app) app (`app.py`) also lets you upload a hand-sign
