@@ -54,10 +54,9 @@ from PIL import Image  # noqa: E402
 from torch import nn  # noqa: E402
 
 from src.dataset import IMAGE_SIZE, get_eval_transforms  # noqa: E402
-from src.infer_camera import load_checkpoint  # noqa: E402
+from src.checkpoint import DEFAULT_CHECKPOINT, load_checkpoint  # noqa: E402
 from src.utils import get_device  # noqa: E402
 
-DEFAULT_CHECKPOINT = "artifacts/checkpoints/best_model.pth"
 GRADCAM_DIR = Path("artifacts/gradcam")
 
 SAMPLE_DATA_NOTE = (

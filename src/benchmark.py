@@ -21,7 +21,6 @@ of truth). Run::
 from __future__ import annotations
 
 import argparse
-import io
 import time
 from pathlib import Path
 from typing import Callable
@@ -32,7 +31,7 @@ matplotlib.use("Agg")  # headless backend — no display required.
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
-from PIL import Image, ImageFilter  # noqa: E402
+from PIL import Image  # noqa: E402
 from torch import nn  # noqa: E402
 from torchvision import transforms  # noqa: E402
 
@@ -44,10 +43,9 @@ from src.dataset import (  # noqa: E402
     get_eval_transforms,
     make_stratified_splits,
 )
-from src.infer_camera import load_checkpoint  # noqa: E402
+from src.checkpoint import DEFAULT_CHECKPOINT, load_checkpoint  # noqa: E402
 from src.utils import get_device, save_json  # noqa: E402
 
-DEFAULT_CHECKPOINT = "artifacts/checkpoints/best_model.pth"
 ARTIFACTS = Path("artifacts")
 WARMUP_FRAMES = 50
 
@@ -219,13 +217,10 @@ def _ablation(
             lat.append((time.perf_counter() - start) * 1000.0)
         return float(np.mean(lat))
 
+    full_ms = _time_pipeline(model, frames, device, full)
     results: list[dict[str, str | float]] = [
-        {"stage": "full", "mean_ms": _time_pipeline(model, frames, device, full)},
-        # ColorJitter is absent at eval — identical to full (documented no-op).
-        {
-            "stage": "skip_colorjitter",
-            "mean_ms": _time_pipeline(model, frames, device, full),
-        },
+        {"stage": "full", "mean_ms": full_ms},
+        {"stage": "skip_colorjitter", "mean_ms": full_ms},
         {
             "stage": "skip_resize",
             "mean_ms": _time_pipeline(model, frames, device, skip_resize),
@@ -267,34 +262,6 @@ def _save_ablation_chart(ablation: list[dict[str, str | float]], path: Path) -> 
 # --------------------------------------------------------------------------- #
 # Distribution-shift characterization
 # --------------------------------------------------------------------------- #
-def _degrade(image: Image.Image, kind: str) -> Image.Image:
-    """Apply a synthetic degradation to a clean RGB PIL image."""
-    if kind == "clean":
-        return image
-    if kind == "gaussian_blur":
-        return image.filter(ImageFilter.GaussianBlur(radius=2.0))
-    if kind == "jpeg_q20":
-        buf = io.BytesIO()
-        image.save(buf, format="JPEG", quality=20)
-        buf.seek(0)
-        return Image.open(buf).convert("RGB")
-    if kind == "brightness_0.4":
-        arr = np.asarray(image).astype(np.float32) * 0.4
-        return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
-    if kind == "brightness_1.8":
-        arr = np.asarray(image).astype(np.float32) * 1.8
-        return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
-    if kind == "salt_pepper_5pct":
-        arr = np.asarray(image).copy()
-        rng = np.random.default_rng(0)
-        mask = rng.random(arr.shape[:2])
-        arr[mask < 0.025] = 0
-        arr[mask > 0.975] = 255
-        return Image.fromarray(arr)
-    raise ValueError(f"Unknown degradation '{kind}'.")
-
-
-@torch.no_grad()
 def _distribution_shift(
     model: nn.Module,
     test_dir: str,
@@ -304,45 +271,20 @@ def _distribution_shift(
     """Measure test accuracy under each synthetic degradation.
 
     Loads the held-out test split via ``make_stratified_splits`` + ``ASLDataset``
-    and classifies each test image after applying each degradation. Uses
-    ``zero_division=0`` semantics: if the test split is empty, accuracies are
-    reported as ``0.0`` rather than dividing by zero.
-
-    Returns:
-        Mapping of degradation name → accuracy in ``[0, 1]``.
+    and delegates to :func:`src.degradations.measure_shift`.
     """
-    transform = get_eval_transforms()
-    degradations = [
-        "clean",
-        "gaussian_blur",
-        "jpeg_q20",
-        "brightness_0.4",
-        "brightness_1.8",
-        "salt_pepper_5pct",
-    ]
+    from src.degradations import DEGRADATION_KINDS, measure_shift
 
+    transform = get_eval_transforms()
     try:
         _, _, test = make_stratified_splits(test_dir, class_names=class_names)
     except RuntimeError as exc:
         print(f"WARNING: distribution-shift skipped — {exc}")
-        return {k: 0.0 for k in degradations}
+        return {k: 0.0 for k in DEGRADATION_KINDS}
 
     dataset = ASLDataset(samples=test, transform=transform, class_names=class_names)
     print(f"Distribution-shift over {len(dataset)} held-out test images.")
-
-    results: dict[str, float] = {}
-    for kind in degradations:
-        correct = 0
-        total = 0
-        for filepath, label in dataset.samples:
-            clean = Image.open(filepath).convert("RGB")
-            degraded = _degrade(clean, kind)
-            tensor = transform(degraded).unsqueeze(0).to(device)
-            pred = int(model(tensor).argmax(dim=1).item())
-            correct += int(pred == label)
-            total += 1
-        results[kind] = (correct / total) if total > 0 else 0.0  # zero_division=0
-    return results
+    return measure_shift(model, dataset.samples, transform, device)
 
 
 # --------------------------------------------------------------------------- #

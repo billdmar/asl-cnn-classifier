@@ -51,7 +51,7 @@ def _preprocess_resized(path: Path) -> np.ndarray:
 
 def test_deployed_checkpoint_matches_committed_onnx() -> None:
     """The .pth the repo trains and the .onnx the site serves must agree."""
-    from src.infer_camera import load_checkpoint
+    from src.checkpoint import load_checkpoint
 
     device = torch.device("cpu")
     model, class_names = load_checkpoint(str(CHECKPOINT), device)

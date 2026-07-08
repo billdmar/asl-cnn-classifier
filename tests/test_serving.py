@@ -29,7 +29,7 @@ from PIL import Image
 from src import benchmark_backends as bb
 from src import export_onnx, quantize, serve
 from src.dataset import get_eval_transforms
-from src.infer_camera import load_checkpoint
+from src.checkpoint import load_checkpoint
 
 DATA_DIR = "data/sample"
 

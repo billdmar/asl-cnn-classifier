@@ -41,7 +41,7 @@ from torchvision import transforms
 from src.benchmark import WARMUP_FRAMES, _load_frames
 from src.dataset import IMAGE_SIZE, get_eval_transforms
 from src.export_onnx import export_to_onnx
-from src.infer_camera import DEFAULT_CHECKPOINT, load_checkpoint
+from src.checkpoint import DEFAULT_CHECKPOINT, load_checkpoint
 from src.quantize import quantize_dynamic_int8
 from src.utils import save_json
 

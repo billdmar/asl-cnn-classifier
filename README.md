@@ -9,22 +9,12 @@
 ![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![ONNX Runtime](https://img.shields.io/badge/ONNX_Runtime-web-005CED?logo=onnx&logoColor=white)
-![PyTorch](https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white)
-![Coverage](https://img.shields.io/badge/coverage-96%25%20(CI%20gate%20%E2%89%A580%25)-brightgreen)
-![License](https://img.shields.io/badge/License-MIT-green)
 
-A polished Next.js + TypeScript site runs a MobileNetV2 ASL classifier **100% in the
-browser** via onnxruntime-web + MediaPipe hand-crop — live webcam frames never leave your
-device. It ships as an installable, offline-capable PWA with IndexedDB model caching,
-shareable result permalinks, a dark/light theme, keyboard shortcuts, and an interactive
-metrics dashboard wired to real, reproducible artifacts. Behind it sits the full
-ML-engineering lifecycle: training, ONNX export with a cross-language preprocessing-parity
-gate, calibration, benchmarking, and CI (TypeScript-strict, unit + parity + Playwright E2E +
-Lighthouse budget). The defining engineering decision is **intellectual honesty about
-accuracy**: the headline number is **55.5% cross-dataset (59.8% on the static A–Y letters)**
-on data the model never trained on — *not* the leakage-inflated 96.9% same-dataset figure —
-with every accuracy lever I tried and rejected documented to a formal "supply-exhausted"
-closure.
+MobileNetV2 classifies ASL alphabet letters **entirely in the browser** via ONNX Runtime Web + MediaPipe hand-crop — webcam frames never leave the device. The full ML lifecycle ships behind it: PyTorch training, ONNX export with a cross-language parity gate, calibration, and CI.
+
+- **Installable PWA** — offline-capable, IndexedDB model cache, dark/light theme, keyboard shortcuts
+- **Honest accuracy** — headline is **55.5% cross-dataset** (59.8% on static A–Y), not the leakage-inflated 96.9% same-dataset figure; every accuracy lever tried and rejected is documented
+- **CI-verified** — TypeScript strict, unit + parity + Playwright E2E, Lighthouse budget (perf 98 / a11y 96)
 
 ![ASL Classifier — live in-browser web app](docs/web-hero.png)
 
@@ -32,6 +22,22 @@ closure.
 onnxruntime-web — frames never leave the browser. The headline number is the honest
 real-world figure (55.5% cross-dataset / 59.8% on static A–Y), not the leakage-inflated
 same-dataset benchmark.*
+
+---
+
+## Contents
+
+- [Run the web app](#run-the-web-app)
+- [Reproduce in 5 minutes](#reproduce-in-5-minutes)
+- [Quickstart](#quickstart)
+- [Key engineering decisions](#key-engineering-decisions)
+- [The honest-accuracy story](#the-honest-accuracy-story)
+- [Highlights](#highlights)
+- [Results](#results)
+- [Reproducing the deployed model](#reproducing-the-deployed-model-555-honest-cross-dataset)
+- [Architecture](#architecture)
+- [Serving, quantization & explainability](#serving-quantization--explainability)
+- [Project layout](#project-layout)
 
 ---
 
@@ -55,23 +61,82 @@ gated ≥90).
 Product niceties:
 
 - **Instant repeat visits** — the ~9 MB model is cached in IndexedDB (keyed by
-  build SHA), so after the first load it starts with no re-download; a slow first
-  load shows a "cached after this" hint with a retry.
+  build SHA), so after the first load it starts with no re-download.
 - **Keyboard shortcuts** — `Space` start/stop camera, `C` copy the spelled word,
   `R` reset, `S` share, `?` for the help dialog.
 - **Shareable results** — share a prediction as a link; `/result` renders the
-  exact letter + probabilities client-side from the URL (the link-preview image
-  is a generic static card — per-result previews need a server this static
-  deploy intentionally doesn't have).
-- **Deploy provenance** — the footer shows the live commit SHA + build date.
-- **Dark / light theme** — a header toggle (default dark) persisted to
-  localStorage with a no-flash pre-paint script; the light palette is WCAG-AA
-  contrast-verified and gated by axe in **both** themes.
-- **Installable + offline PWA** — a web manifest + maskable icons make it
-  installable to the home screen; a service worker caches the app shell (and
-  MediaPipe assets) so it runs offline after the first visit. The ~9 MB model is
-  served from IndexedDB (the SW deliberately doesn't touch `/model`). Plus
-  sitemap / robots / schema.org JSON-LD with the honest accuracy numbers.
+  exact letter + probabilities client-side from the URL.
+- **Dark / light theme** — persisted toggle, WCAG-AA contrast-verified in both
+  themes via axe, no-flash pre-paint script.
+- **Installable + offline PWA** — service worker caches the app shell so it runs
+  offline after the first visit.
+
+---
+
+## Reproduce in 5 minutes
+
+The fastest path from a clean clone to a running pipeline — entirely on the
+committed 232-image synthetic sample (no Kaggle download, no GPU). This proves
+the wiring end-to-end; it does **not** produce meaningful accuracy (that needs
+the real dataset — see
+[Reproducing the deployed model](#reproducing-the-deployed-model-555-honest-cross-dataset)).
+
+```bash
+# 0. Prereq: install uv (https://docs.astral.sh/uv/) — e.g. `brew install uv`.
+git clone https://github.com/billdmar/asl-cnn-classifier && cd asl-cnn-classifier
+
+make install        # uv venv (Py 3.12) + deps + regenerate sample data
+make sample-train   # 2-epoch smoke train on the 232-image sample → best_model.pth (CPU, <60s)
+make eval           # confusion matrix + per-class F1 on the sample → artifacts/metrics.json
+make benchmark      # CPU latency/throughput + preprocessing ablation + dist-shift
+
+# Classify one image headlessly, no server:
+.venv/bin/python -m src.infer_camera --source data/sample/A/0.png --device cpu
+```
+
+Everything above runs CPU-only in a couple of minutes. Accuracy on the sample
+is **meaningless by design** — it is a wiring fixture.
+
+## Quickstart
+
+```bash
+# 1. Install (creates an isolated Python 3.12 venv via uv and installs deps)
+make install
+
+# 2. Run the whole pipeline on the committed sample subset — no Kaggle needed
+make sample-train     # trains 2 epochs on the 232-image sample fixture (CPU, <60s)
+make eval             # confusion matrix, per-class F1, metrics.json
+make gradcam          # Grad-CAM overlay (artifacts/gradcam/<class>.png)
+make calibration      # ECE + reliability diagram (artifacts/calibration.json)
+make benchmark        # latency/throughput + preprocessing ablation + dist-shift
+make test             # pytest suite with coverage (>=80% enforced)
+make typecheck        # mypy type-check gate (scoped to src/)
+
+# Container: build the CPU image and run headless inference inside it
+make docker-test      # docker build + in-container `infer_camera` on the sample
+
+# 3. Real-time camera demo (needs a webcam)
+make camera
+# or classify a single image headlessly:
+python -m src.infer_camera --source data/sample/A/0.png
+```
+
+> Uses [`uv`](https://github.com/astral-sh/uv) to manage Python 3.12 (PyTorch has
+> no wheels for newer interpreters). Install uv with `brew install uv` or the
+> [standalone installer](https://docs.astral.sh/uv/getting-started/installation/).
+
+---
+
+## Key engineering decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| **No horizontal flip** in augmentation | ASL signs are not flip-invariant — b/d, p/q are mirror images. Flipping creates mislabeled training data. |
+| **Cross-dataset gate** as the shipping metric | Same-dataset accuracy is inflated by video-frame leakage; only a stranger's hand measures real generalization. |
+| **File-level stratified splits** | Prevents augmented views of the same image leaking across train/test. Dedup-aware mode clusters near-duplicate video frames. |
+| **Single source of truth** for transforms | `get_eval_transforms()` is imported by every consumer — no silent preprocessing drift between training and inference. |
+| **Negative results documented** | Every rejected lever (TTA, thresholds, temperature, architecture swaps) has a written experiment report — shows rigor, not just successes. |
+| **Cross-language parity test** | The browser (TypeScript/ONNX) and Python paths must agree to ~5e-7 — not assumed, CI-tested. |
 
 ---
 
@@ -100,32 +165,6 @@ code, never hardcoded.*
 
 ---
 
-## Legacy Gradio demo (optional)
-
-Before the web app, the project shipped a [Gradio](https://gradio.app) app (`app.py`) on
-Hugging Face Spaces — upload a hand-sign image, get the predicted class + top-5
-probabilities. It's the optional legacy backend the website does **not** depend on, kept for
-reference: [**Gradio app on Hugging Face Spaces**](https://huggingface.co/spaces/billdmar/asl-cnn-classifier).
-
-> Deployed with one command — `make deploy-hf` (see
-> [`docs/DEPLOY.md`](docs/DEPLOY.md)).
-
-Run it locally:
-
-```bash
-make install
-.venv/bin/python -m pip install gradio    # or: uv pip install gradio
-.venv/bin/python app.py                   # opens http://127.0.0.1:7860
-```
-
-> Heads-up: with no trained checkpoint present, the app (and CLI) fall back to
-> an **untrained random-init** model — predictions are meaningless and the UI
-> says so. Train a model first (see
-> [Reproducing the deployed model](#reproducing-the-deployed-model-555-honest-cross-dataset))
-> for real results.
-
----
-
 ## Highlights
 
 - **Live in-browser web app** — Next.js + TypeScript running MobileNetV2 **100%
@@ -144,47 +183,19 @@ make install
 - **Reproducible** — global seeding; file-level stratified 70/15/15 splits
   (`StratifiedShuffleSplit`) so no augmented view leaks across splits; one-command
   `make reproduce-deployed`.
-- **Real-time inference** — both the in-browser webcam path and a legacy OpenCV camera loop
-  with an ROI box, on-screen prediction, confidence, and a rolling FPS counter.
 - **Rigorous evaluation** — a 26×26 confusion matrix, per-class F1, top confused
-  pairs, and accuracy under five synthetic distribution shifts.
-- **Explainability & calibration** — from-scratch Grad-CAM saliency overlays and
-  Expected Calibration Error (ECE) with a reliability diagram (the ECE math is
-  unit-tested against analytically known values).
+  pairs, accuracy under five synthetic distribution shifts, and from-scratch Grad-CAM
+  saliency overlays.
 - **Production-style serving** — ONNX export with an onnxruntime↔PyTorch parity
-  test, INT8 dynamic quantization, and a FastAPI inference endpoint — alongside
-  the existing OpenCV live-camera loop.
-- **Benchmarked** — end-to-end latency (p50/p95/p99) and throughput on CPU and
-  Apple-Silicon MPS, plus a preprocessing-stage ablation and a FP32-vs-ONNX-vs-INT8
-  backend comparison.
+  test, INT8 dynamic quantization, FastAPI inference endpoint, and a FP32-vs-ONNX-vs-INT8
+  multi-backend benchmark.
+- **Calibrated** — Expected Calibration Error (ECE) with a reliability diagram; the
+  ECE math is unit-tested against analytically known values.
 - **Engineered** — ~96% test coverage with an 80% CI gate, a GitHub Actions CI
-  matrix (Python 3.11 & 3.12) running ruff + black + a `mypy src` type-check gate
-  plus a sample-train → eval → inference smoke sequence, a separate Docker job that
-  builds the image and runs headless inference in-container, TensorBoard logging,
-  and a full MODEL_CARD.
+  matrix (Python 3.11 & 3.12) running ruff + black + mypy, Docker build verification,
+  TensorBoard logging, and a full MODEL_CARD.
 
 ## Results
-
-> **Accuracy status — read this** (the full narrative is in
-> [The honest-accuracy story](#the-honest-accuracy-story) above). The headline is
-> **cross-dataset accuracy on a *different* dataset** the model never trained on
-> ([`EitanG98/asl_letters`](https://huggingface.co/datasets/EitanG98/asl_letters),
-> different signers and real backgrounds): **59.8% on the 24-letter A–Y headline**
-> (excluding J and Z, which are *dynamic motion signs* a single static frame
-> cannot capture — the mainstream convention, e.g. Sign Language MNIST), or
-> **55.5% across all 26 classes** — vs an inflated **96.9% same-dataset** benchmark.
-> It climbed **33.4% → 47.6% → 55.5%** as training added genuinely diverse
-> datasets ([`aliciiavs/sign_language_image_dataset`](https://huggingface.co/datasets/aliciiavs/sign_language_image_dataset)
-> then [`Hemg/sign_language_dataset`](https://huggingface.co/datasets/Hemg/sign_language_dataset)),
-> while preprocessing and inference-time tricks (crop, sketch-clean, augmentation,
-> per-class thresholds, TTA, temperature) were all measured and found *not* to
-> help — see [`docs/`](docs/) for the full honest investigation. Reproduce the
-> whole deployed checkpoint end-to-end with one command — **`make reproduce-deployed`**
-> (downloads the 3 sources + the held-out gate, verifies non-overlap, trains, and
-> evaluates; ~50 min on Apple-Silicon MPS). It chains
-> `download-real → download-diverse → download-hemg → download-crossval →
-> check-overlap-hemg → train-diverse-hemg → eval-realworld-diverse-hemg`, which you
-> can also run individually.
 
 | Metric | Value | Source |
 | --- | --- | --- |
@@ -203,72 +214,7 @@ make install
 | MPS throughput | **785 FPS** | measured, this machine |
 
 *Latency/throughput measured with `make benchmark` (1000 frames, warm-up
-excluded) on the author's Apple-Silicon Mac. These numbers do not depend on
-training (they time the forward pass + preprocessing with any weights), so they
-reproduce on a fresh checkout — but the raw `artifacts/benchmark_results.json`
-is regenerated at runtime (the `artifacts/` directory is git-ignored) rather
-than committed, and the exact figures vary with hardware. On a CPU sandbox,
-`make benchmark` here reports ~6 ms/frame, consistent with the ~5 ms above.*
-
-## Reproduce in 5 minutes
-
-The fastest path from a clean clone to a running pipeline — entirely on the
-committed 232-image synthetic sample (no Kaggle download, no GPU). This proves
-the wiring end-to-end; it does **not** produce meaningful accuracy (that needs
-the real dataset — see
-[Reproducing the deployed model](#reproducing-the-deployed-model-555-honest-cross-dataset)).
-
-```bash
-# 0. Prereq: install uv (https://docs.astral.sh/uv/) — e.g. `brew install uv`.
-git clone https://github.com/billdmar/asl-cnn-classifier && cd asl-cnn-classifier
-
-make install        # uv venv (Py 3.12) + deps + regenerate sample data
-make sample-train   # 2-epoch smoke train on the 232-image sample → best_model.pth (CPU, <60s)
-make eval           # confusion matrix + per-class F1 on the sample → artifacts/metrics.json
-make benchmark      # CPU latency/throughput + preprocessing ablation + dist-shift
-
-# Try the Gradio demo app (image upload → class + top-5):
-uv pip install gradio
-.venv/bin/python app.py                 # http://127.0.0.1:7860
-# ...or classify one image headlessly, no server:
-.venv/bin/python -m src.infer_camera --source data/sample/A/0.png --device cpu
-```
-
-Everything above runs CPU-only in a couple of minutes. `make sample-train`
-writes `artifacts/checkpoints/best_model.pth`, which `make eval`, `make
-benchmark`, and the demo app then pick up automatically. Accuracy on the sample
-is **meaningless by design** — it is a wiring fixture.
-
-## Quickstart
-
-```bash
-# 1. Install (creates an isolated Python 3.12 venv via uv and installs deps)
-make install
-
-# 2. Run the whole pipeline on the committed sample subset — no Kaggle needed
-make sample-train     # trains 2 epochs on the 232-image sample fixture (CPU, <60s)
-make eval             # confusion matrix, per-class F1, metrics.json
-make gradcam          # Grad-CAM overlay (artifacts/gradcam/<class>.png)
-make calibration      # ECE + reliability diagram (artifacts/calibration.json)
-make benchmark        # latency/throughput + preprocessing ablation + dist-shift
-make test             # pytest suite with coverage (>=80% enforced)
-make typecheck        # mypy type-check gate (scoped to src/)
-
-# Container: build the CPU image and run headless inference inside it
-make docker-test      # docker build + in-container `infer_camera` on the sample
-
-# Per-class F1 bar chart from an existing metrics.json:
-python -m src.plot_per_class --metrics artifacts/metrics.json
-
-# 3. Real-time camera demo (needs a webcam)
-make camera
-# or classify a single image headlessly:
-python -m src.infer_camera --source data/sample/A/0.png
-```
-
-> Uses [`uv`](https://github.com/astral-sh/uv) to manage Python 3.12 (PyTorch has
-> no wheels for newer interpreters). Install uv with `brew install uv` or the
-> [standalone installer](https://docs.astral.sh/uv/getting-started/installation/).
+excluded) on the author's Apple-Silicon Mac. The exact figures vary with hardware.*
 
 ## Reproducing the deployed model (55.5% honest cross-dataset)
 
@@ -298,8 +244,7 @@ The honest cross-dataset result lands in `artifacts/realworld_eval_diverse_hemg.
 (**55.5% all-26 / 59.8% A–Y headline**). The same-dataset benchmark (96.9%) comes
 from `make eval-real`. Everything is seeded (`seed: 42`) and the splits are
 file-level stratified, so runs are reproducible. The full journey — including the
-levers that were measured and rejected (crop-consistency, augmentation,
-calibration, class-balancing, two architecture swaps) — is documented honestly in
+levers that were measured and rejected — is documented honestly in
 [`docs/EXPERIMENT_*.md`](docs/).
 
 ## Architecture
@@ -316,20 +261,8 @@ Input 3×128×128
 
 Global average pooling keeps the classifier head tiny, so the whole network is
 **~657K parameters** — fast to train and deploy. The MobileNetV2 variant
-(`--arch mobilenet_v2`) freezes the ImageNet backbone for a 5-epoch warm-up,
+(`--arch mobilenet_v2`) freezes the ImageNet backbone for a 3-epoch warm-up,
 then fine-tunes end-to-end at a 10× lower learning rate.
-
-## Preprocessing ablation & distribution shift
-
-`make benchmark` localizes the inference bottleneck by progressively removing
-preprocessing stages. On this machine the model forward pass is roughly half of
-end-to-end latency; resize and normalization account for most of the rest (see
-`artifacts/benchmark_ablation.png`).
-
-It also characterizes how accuracy degrades under five synthetic corruptions
-(Gaussian blur, JPEG q20, brightness ×0.4 / ×1.8, 5% salt-and-pepper) →
-`artifacts/distribution_shift.json`. Low-light (brightness ×0.4) is the harshest
-shift, which mirrors real-world failure modes.
 
 ## Serving, quantization & explainability
 
@@ -348,75 +281,48 @@ make calibration        # ECE + reliability diagram → artifacts/calibration.js
 ```
 
 - **ONNX parity is a tested invariant:** `tests/test_serving.py` asserts the
-  onnxruntime logits match PyTorch within `atol=1e-4` on the same input, so the
-  export is verified numerically rather than assumed.
-- **INT8 quantization** reports the *measured* FP32-vs-INT8 on-disk size from your
-  own run (the reduction is modest because the CustomCNN is convolution-heavy and
-  eager dynamic quantization only covers its two `Linear` layers).
-- **Calibration:** the ECE computation itself is unit-tested against analytically
-  known cases (perfectly-calibrated → 0; hand-constructed bins → exact values).
+  onnxruntime logits match PyTorch within `atol=1e-4` on the same input.
+- **INT8 quantization** reports the *measured* FP32-vs-INT8 on-disk size delta.
+- **Calibration:** the ECE computation is unit-tested against analytically known values.
 
 > **Honest caveat.** With no trained checkpoint present these tools run on a
-> random-init model over the synthetic sample fixture, so the Grad-CAM overlays,
-> ECE value, and any accuracy figures are **wiring demonstrations, not meaningful
-> results** — every script says so in its output. Train on the real dataset for
-> interpretable saliency and trustworthy calibration. The ONNX parity, size
-> delta, and latency timings are real regardless of weights.
-
-## Common confusions
-
-ASL letters that share hand shapes are the usual error sources — **M/N/S**
-(fist variants) and **A/E/S** are classic confusions. After training, the
-top-10 confused pairs are written to `artifacts/per_class_errors.txt` and
-visualized in `artifacts/confusion_matrix.png`.
-
-## Real-world caveat
-
-Same-dataset accuracy (96.9%) is measured on held-out images that resemble the
-training set (similar signers, lighting, backgrounds). **Real-world accuracy is
-lower** — the honest cross-dataset number is **59.8% (A–Y) / 55.5% (26-class)**
-on different signers and real backgrounds, and it still varies with lighting,
-skin tone, background clutter, and camera angle. That gap (and how stacking
-diverse training datasets closed it from 33.4% → 55.5%, while preprocessing and
-inference-time tricks did not move it) is documented in
-[`docs/EXPERIMENT_diverse_multisource.md`](docs/EXPERIMENT_diverse_multisource.md),
-[`docs/EXPERIMENT_data_diversity_scaling.md`](docs/EXPERIMENT_data_diversity_scaling.md),
-and [`docs/EXPERIMENT_crop_consistent_retrain.md`](docs/EXPERIMENT_crop_consistent_retrain.md).
-J and Z are *dynamic motion signs* — a single static frame cannot fully capture
-them, so they are excluded from the A–Y headline (mainstream convention) and
-reported separately. See [`MODEL_CARD.md`](MODEL_CARD.md) for limitations and
-ethical considerations.
+> random-init model over the synthetic sample fixture — every script says so in
+> its output. Train on the real dataset for meaningful results.
 
 ## Project layout
 
 ```
 src/
+  checkpoint.py         # canonical model loading (single source of truth)
   dataset.py            # ASLDataset, stratified splits, canonical DRY transforms
+  degradations.py       # synthetic image corruptions for robustness evaluation
   model.py              # CustomCNN, MobileNetV2/ResNet18 transfer, build_model factory
   train.py              # training loop: cosine LR, early stopping, TensorBoard, AMP
   eval.py               # confusion matrix, per-class F1, distribution shift
   gradcam.py            # from-scratch Grad-CAM saliency overlays
   calibration.py        # Expected Calibration Error + reliability diagram
-  plot_per_class.py     # per-class F1 bar chart from metrics.json
   infer_camera.py       # real-time OpenCV inference (ROI, FPS, snapshots)
   benchmark.py          # latency/throughput + preprocessing ablation
   benchmark_backends.py # FP32 vs ONNX vs INT8 latency/throughput comparison
   export_onnx.py        # ONNX export (dynamic batch axis)
   quantize.py           # INT8 dynamic quantization + on-disk size report
   serve.py              # FastAPI inference endpoint (/predict, /health)
-  download_data.py      # Kaggle download helper
   utils.py              # seeding, device selection (CUDA → MPS → CPU)
 app.py                  # Gradio demo app (HF Spaces entry point)
-docs/DEPLOY.md          # one-time Hugging Face Space deployment steps
-tests/                  # test suite with coverage (see the Tests badge)
-configs/                # train_custom_cnn.yaml, train_mobilenet.yaml
+web/                    # Next.js + TypeScript in-browser classifier site
+tests/                  # 238 tests, ~96% coverage (see the CI badge)
+configs/                # YAML training configs (custom CNN, transfer variants)
 data/sample/            # 232 committed sample images (CI fixture)
+docs/                   # experiment write-ups (including negative results)
 ```
 
 ## Dataset
 
 [ASL Alphabet](https://www.kaggle.com/datasets/grassknoted/asl-alphabet) by
 *grassknoted* on Kaggle — ~87,000 200×200 RGB images across 29 classes.
+The deployed model trains on the **union of three HuggingFace Hub datasets**
+(Marxulia, aliciiavs, Hemg) for diversity; see
+[Reproducing the deployed model](#reproducing-the-deployed-model-555-honest-cross-dataset).
 
 ## License
 

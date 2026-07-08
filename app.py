@@ -33,7 +33,7 @@ import torch
 from PIL import Image
 
 from src.dataset import get_eval_transforms
-from src.infer_camera import DEFAULT_CHECKPOINT, load_checkpoint
+from src.checkpoint import DEFAULT_CHECKPOINT, load_checkpoint
 from src.utils import get_device
 
 # Number of class probabilities to surface in the UI / return value.

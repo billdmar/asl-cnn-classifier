@@ -30,7 +30,7 @@ from PIL import Image, UnidentifiedImageError
 from torch import nn
 
 from src.dataset import get_eval_transforms
-from src.infer_camera import DEFAULT_CHECKPOINT, load_checkpoint
+from src.checkpoint import DEFAULT_CHECKPOINT, load_checkpoint
 
 # Checkpoint path is overridable via env var so the same app object can serve a
 # real checkpoint in production without code changes.
