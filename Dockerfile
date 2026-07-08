@@ -11,13 +11,16 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install torch/torchvision from the CPU wheel index first, then the remaining
-# dependencies from PyPI. (No build-essentials needed: all deps ship wheels.)
-COPY requirements.txt ./
+# Install torch/torchvision from the CPU wheel index first (avoids pulling huge
+# CUDA wheels), then install the project from pyproject.toml which resolves the
+# remaining dependencies from PyPI. Copy only the build metadata first for
+# Docker layer caching — dependencies change far less often than source code.
+COPY pyproject.toml README.md ./
+COPY src/__init__.py src/__init__.py
 RUN pip install --no-cache-dir \
         --index-url https://download.pytorch.org/whl/cpu \
         "torch>=2.2,<3.0" "torchvision>=0.17,<1.0" \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir .
 
 # Copy the project source (includes the committed data/sample fixture, so the
 # image can run a headless inference end-to-end without external data).
@@ -37,8 +40,8 @@ CMD ["python", "-m", "src.infer_camera", \
 #
 #   FROM pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime
 #   WORKDIR /app
-#   COPY requirements.txt ./
-#   RUN pip install --no-cache-dir -r requirements.txt
+#   COPY pyproject.toml src/__init__.py ./
+#   RUN pip install --no-cache-dir .
 #   COPY . .
 #   CMD ["python", "-m", "src.eval", "--help"]
 # ---------------------------------------------------------------------------

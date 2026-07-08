@@ -15,7 +15,7 @@ import torch
 
 from src import benchmark as bench
 from src.dataset import get_eval_transforms
-from src.infer_camera import load_checkpoint
+from src.checkpoint import load_checkpoint
 
 DATA_DIR = "data/sample"
 
@@ -69,6 +69,8 @@ def test_degrade_and_unknown():
 
     import pytest
 
+    from src.degradations import degrade
+
     img = Image.new("RGB", (16, 16), (90, 100, 110))
     for kind in [
         "clean",
@@ -78,9 +80,9 @@ def test_degrade_and_unknown():
         "brightness_1.8",
         "salt_pepper_5pct",
     ]:
-        assert bench._degrade(img, kind).size == (16, 16)
+        assert degrade(img, kind).size == (16, 16)
     with pytest.raises(ValueError):
-        bench._degrade(img, "bogus")
+        degrade(img, "bogus")
 
 
 def test_distribution_shift_with_data():

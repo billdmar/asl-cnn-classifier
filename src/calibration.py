@@ -62,17 +62,12 @@ from torch.utils.data import DataLoader  # noqa: E402
 
 from src.dataset import (  # noqa: E402
     ASLDataset,
-    _list_samples,
-    get_class_names,
     get_eval_transforms,
-    get_union_class_names,
-    make_stratified_splits,
+    recreate_splits,
 )
-from src.infer_camera import load_checkpoint  # noqa: E402
-from src.train import _normalize_data_dirs  # noqa: E402
+from src.checkpoint import DEFAULT_CHECKPOINT, load_checkpoint  # noqa: E402
 from src.utils import get_device, load_json, save_json, set_seed  # noqa: E402
 
-DEFAULT_CHECKPOINT = "artifacts/checkpoints/best_model.pth"
 ARTIFACTS = Path("artifacts")
 
 SAMPLE_DATA_NOTE = (
@@ -418,22 +413,10 @@ def main() -> int:
     device = get_device(args.device)
     print(f"Using device: {device}")
 
-    # Mirror train.py's single-vs-multi-dir handling so a model trained on a
-    # merged union is calibrated on the matching merged held-out split.
-    data_dirs = _normalize_data_dirs(args.data_dir)
-    if len(data_dirs) == 1:
-        class_names = get_class_names(data_dirs[0])
-        _train, _val, test_samples = make_stratified_splits(
-            data_dirs[0], seed=args.seed, class_names=class_names
-        )
-    else:
-        class_names = get_union_class_names(data_dirs)
-        merged: list[tuple[str, int]] = []
-        for d in data_dirs:
-            merged.extend(_list_samples(d, class_names))
-        _train, _val, test_samples = make_stratified_splits(
-            samples=merged, seed=args.seed, class_names=class_names
-        )
+    # Recreate the SAME test split train.py held out (deterministic given seed).
+    _train, _val, test_samples, class_names = recreate_splits(
+        args.data_dir, seed=args.seed
+    )
     print(f"Held-out test split: {len(test_samples)} samples.")
 
     test_ds = ASLDataset(

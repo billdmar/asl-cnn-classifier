@@ -49,20 +49,6 @@ DEFAULT_SIZE = 200
 _IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".bmp", ".webp")
 
 
-def _first_image(class_dir: Path) -> Path | None:
-    """Return the first image file in ``class_dir`` (sorted), or ``None``.
-
-    Sorting by name keeps the choice deterministic across runs and machines.
-    """
-    if not class_dir.is_dir():
-        return None
-    candidates = sorted(
-        p
-        for p in class_dir.iterdir()
-        if p.is_file() and p.suffix.lower() in _IMAGE_SUFFIXES
-    )
-    return candidates[0] if candidates else None
-
 
 def extract_examples(
     src: Path,

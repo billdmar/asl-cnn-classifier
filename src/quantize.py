@@ -27,7 +27,7 @@ from pathlib import Path
 import torch
 from torch import nn
 
-from src.infer_camera import DEFAULT_CHECKPOINT, load_checkpoint
+from src.checkpoint import DEFAULT_CHECKPOINT, load_checkpoint
 from src.utils import get_device, save_json
 
 DEFAULT_OUTPUT = "artifacts/quantization.json"

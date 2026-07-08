@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.gradcam import run_gradcam  # noqa: E402
-from src.infer_camera import load_checkpoint  # noqa: E402
+from src.checkpoint import load_checkpoint  # noqa: E402
 from src.utils import get_device  # noqa: E402
 
 

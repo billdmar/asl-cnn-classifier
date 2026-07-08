@@ -34,6 +34,14 @@ export const UploadPanel = dynamic(
   },
 );
 
+export const ExplainerPanel = dynamic(
+  () => import("@/components/explainer/explainer-panel").then((m) => m.ExplainerPanel),
+  {
+    ssr: false,
+    loading: () => <SkeletonCard minHeight={480} label="Loading explainer" />,
+  },
+);
+
 export const MetricsDashboard = dynamic(
   () => import("@/components/metrics/metrics-dashboard").then((m) => m.MetricsDashboard),
   {

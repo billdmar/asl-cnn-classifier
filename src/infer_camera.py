@@ -31,65 +31,15 @@ import torch
 from PIL import Image
 from torch import nn
 
-from src.dataset import get_class_names, get_eval_transforms
-from src.model import build_model
-from src.utils import get_device, load_json
+from src.checkpoint import DEFAULT_CHECKPOINT, load_checkpoint
+from src.dataset import get_eval_transforms
+from src.utils import get_device
 
 # File extensions we treat as still images vs. video containers.
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
 VIDEO_EXTS = {".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v"}
 
-DEFAULT_CHECKPOINT = "artifacts/checkpoints/best_model.pth"
 SNAPSHOT_DIR = Path("artifacts/camera_snapshots")
-
-
-def load_checkpoint(
-    path: str | Path, device: torch.device
-) -> tuple[nn.Module, list[str]]:
-    """Load a model + class names from a training checkpoint.
-
-    The checkpoint schema is
-    ``{"model_state_dict", "arch", "class_names", "config", "val_accuracy"}``.
-    The model is rebuilt from the checkpoint's recorded ``arch`` and moved to
-    ``device`` in eval mode.
-
-    If ``path`` does not exist, this falls back to an **untrained**
-    ``custom_cnn`` with random weights and prints a clear warning, so the
-    inference and benchmark scripts remain runnable before any real checkpoint
-    has been produced.
-
-    Args:
-        path: Path to the ``.pth`` checkpoint.
-        device: Target compute device.
-
-    Returns:
-        A tuple of ``(model, class_names)`` with the model in eval mode on
-        ``device``.
-    """
-    path = Path(path)
-    if not path.exists():
-        print(
-            f"WARNING: checkpoint '{path}' not found — falling back to an "
-            "UNTRAINED custom_cnn with random weights. Predictions will be "
-            "meaningless; train a model to produce real results."
-        )
-        class_names = get_class_names()
-        model = build_model(
-            "custom_cnn", num_classes=len(class_names), pretrained=False
-        )
-        model.to(device).eval()
-        return model, class_names
-
-    checkpoint = torch.load(path, map_location=device, weights_only=False)
-    arch = checkpoint["arch"]
-    class_names = checkpoint.get("class_names") or get_class_names()
-    model = build_model(arch, num_classes=len(class_names), pretrained=False)
-    model.load_state_dict(checkpoint["model_state_dict"])
-    model.to(device).eval()
-    val_acc = checkpoint.get("val_accuracy")
-    acc_str = f"{val_acc:.4f}" if isinstance(val_acc, (int, float)) else "n/a"
-    print(f"Loaded checkpoint '{path}' (arch={arch}, val_accuracy={acc_str}).")
-    return model, class_names
 
 
 def _center_roi(frame_h: int, frame_w: int, roi_size: int) -> tuple[int, int, int, int]:
@@ -305,11 +255,6 @@ def main() -> int:
     """Parse CLI args, load the model, and dispatch to the right run mode."""
     parser = argparse.ArgumentParser(description="Real-time ASL OpenCV inference.")
     parser.add_argument(
-        "--config",
-        default=None,
-        help="Optional training-config YAML/JSON (unused for inference logic).",
-    )
-    parser.add_argument(
         "--checkpoint", default=DEFAULT_CHECKPOINT, help="Path to model checkpoint."
     )
     parser.add_argument(
@@ -330,15 +275,6 @@ def main() -> int:
         help="Side length (px) of the centered ROI.",
     )
     args = parser.parse_args()
-
-    # The config is accepted for symmetry with the other scripts; inference
-    # preprocessing is fully determined by get_eval_transforms(), so we only
-    # touch the config to validate it is loadable when provided.
-    if args.config is not None and Path(args.config).exists():
-        try:
-            load_json(args.config)
-        except Exception:  # noqa: BLE001 - YAML configs aren't JSON; ignore.
-            pass
 
     device = get_device(args.device)
     print(f"Using device: {device}")

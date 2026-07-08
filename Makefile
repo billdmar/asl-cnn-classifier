@@ -11,7 +11,7 @@ HF_SPACE ?=
 # Create the venv, install dev deps, and regenerate the committed sample data.
 install:
 	uv venv --python 3.12
-	uv pip install -r requirements-dev.txt
+	uv pip install -e ".[dev]"
 	$(PY) -m src.make_sample_data
 
 # Download the real 26-class ASL dataset from the public HF Hub (no credentials)

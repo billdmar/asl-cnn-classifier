@@ -75,9 +75,10 @@ def test_load_checkpoint_fallback(capsys):
 
 
 def test_load_checkpoint_real(tmp_path, capsys):
+    from src.dataset import get_class_names
     from src.model import build_model
 
-    class_names = ic.get_class_names()
+    class_names = get_class_names()
     model = build_model("custom_cnn", num_classes=len(class_names))
     ckpt = tmp_path / "m.pth"
     torch.save(

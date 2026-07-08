@@ -36,7 +36,7 @@ from sklearn.metrics import classification_report, confusion_matrix
 
 from src.dataset import _list_samples, get_class_names, get_eval_transforms
 from src.eval import most_confused_pairs
-from src.infer_camera import DEFAULT_CHECKPOINT, load_checkpoint
+from src.checkpoint import DEFAULT_CHECKPOINT, load_checkpoint
 from src.utils import get_device, load_json, save_json
 
 ARTIFACTS = Path("artifacts")

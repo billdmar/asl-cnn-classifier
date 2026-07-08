@@ -12,6 +12,7 @@ Run ``python -m src.dataset --data_dir data/sample`` to print dataset stats.
 from __future__ import annotations
 
 import argparse
+import re
 from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
@@ -185,6 +186,71 @@ def get_union_class_names(root_dirs: Sequence[str | Path]) -> list[str]:
     return sorted(found) if found else list(CLASS_NAMES)
 
 
+def normalize_data_dirs(data_dir) -> list[str]:
+    """Normalize a ``data_dir`` config value to a list of directory strings.
+
+    Accepts a single path string, a YAML list of paths, or a comma-separated
+    string (the CLI ``--data_dir "a,b"`` override form). A single dir yields a
+    one-element list so the caller's single-source path stays unchanged.
+    """
+    if isinstance(data_dir, (list, tuple)):
+        dirs = [str(d).strip() for d in data_dir]
+    else:
+        dirs = [part.strip() for part in str(data_dir).split(",")]
+    return [d for d in dirs if d]
+
+
+def recreate_splits(
+    data_dir: str,
+    seed: int = 42,
+    train_frac: float = 0.70,
+    val_frac: float = 0.15,
+    test_frac: float = 0.15,
+) -> tuple[
+    list[tuple[str, int]],
+    list[tuple[str, int]],
+    list[tuple[str, int]],
+    list[str],
+]:
+    """Normalize data dirs and return stratified (train, val, test, class_names).
+
+    Encapsulates the repeated pattern: normalize the data_dir value (single
+    string, comma-separated, or list) -> resolve class names (single-dir or
+    union) -> produce the deterministic stratified file-level split. Every
+    consumer that needs to recreate the same split ``train.py`` held out calls
+    this rather than duplicating the 15-line branch.
+
+    Returns:
+        A 4-tuple of ``(train_samples, val_samples, test_samples, class_names)``
+        where each sample list is ``[(filepath, label_int), ...]``.
+    """
+    data_dirs = normalize_data_dirs(data_dir)
+    if len(data_dirs) == 1:
+        class_names = get_class_names(data_dirs[0])
+        train, val, test = make_stratified_splits(
+            data_dirs[0],
+            train_frac=train_frac,
+            val_frac=val_frac,
+            test_frac=test_frac,
+            seed=seed,
+            class_names=class_names,
+        )
+    else:
+        class_names = get_union_class_names(data_dirs)
+        merged: list[tuple[str, int]] = []
+        for d in data_dirs:
+            merged.extend(_list_samples(d, class_names))
+        train, val, test = make_stratified_splits(
+            samples=merged,
+            train_frac=train_frac,
+            val_frac=val_frac,
+            test_frac=test_frac,
+            seed=seed,
+            class_names=class_names,
+        )
+    return train, val, test, class_names
+
+
 def _list_samples(
     root_dir: str | Path, class_names: list[str]
 ) -> list[tuple[str, int]]:
@@ -267,8 +333,6 @@ def _frame_sort_key(filepath: str) -> tuple[int, str]:
     leading integer restores sequence; names without a number fall back to a
     stable lexical tail so the key is always total and deterministic.
     """
-    import re
-
     nums = re.findall(r"\d+", Path(filepath).name)
     return (int(nums[0]) if nums else -1, filepath)
 
