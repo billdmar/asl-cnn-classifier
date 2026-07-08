@@ -22,7 +22,7 @@ import torch
 from torch import nn
 
 from src.dataset import IMAGE_SIZE
-from src.infer_camera import DEFAULT_CHECKPOINT, load_checkpoint
+from src.checkpoint import DEFAULT_CHECKPOINT, load_checkpoint
 from src.utils import get_device
 
 DEFAULT_OUTPUT = "artifacts/model.onnx"

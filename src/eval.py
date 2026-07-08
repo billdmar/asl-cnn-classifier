@@ -27,7 +27,6 @@ Run, e.g.::
 from __future__ import annotations
 
 import argparse
-import io
 from pathlib import Path
 from typing import Any
 
@@ -38,24 +37,20 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import seaborn as sns  # noqa: E402
 import torch  # noqa: E402
-from PIL import Image, ImageFilter  # noqa: E402
+from PIL import Image  # noqa: E402
 from sklearn.metrics import classification_report, confusion_matrix  # noqa: E402
 from torch import nn  # noqa: E402
 from torch.utils.data import DataLoader  # noqa: E402
 
 from src.dataset import (  # noqa: E402
     ASLDataset,
-    _list_samples,
-    get_class_names,
     get_eval_transforms,
-    get_union_class_names,
-    make_stratified_splits,
+    recreate_splits,
 )
-from src.infer_camera import load_checkpoint  # noqa: E402
-from src.train import _normalize_data_dirs  # noqa: E402
+from src.checkpoint import DEFAULT_CHECKPOINT, load_checkpoint  # noqa: E402
+from src.degradations import degrade  # noqa: E402
 from src.utils import get_device, save_json, set_seed  # noqa: E402
 
-DEFAULT_CHECKPOINT = "artifacts/checkpoints/best_model.pth"
 ARTIFACTS = Path("artifacts")
 
 SAMPLE_DATA_NOTE = (
@@ -170,37 +165,6 @@ def save_per_class_errors(pairs: list[dict[str, Any]], path: Path) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _degrade(image: Image.Image, kind: str) -> Image.Image:
-    """Apply a synthetic degradation to a clean RGB PIL image.
-
-    Mirrors the five degradations used in ``benchmark.py`` so eval is
-    self-contained; for the canonical study prefer ``python -m src.benchmark``.
-    """
-    if kind == "clean":
-        return image
-    if kind == "gaussian_blur":
-        return image.filter(ImageFilter.GaussianBlur(radius=2.0))
-    if kind == "jpeg_q20":
-        buf = io.BytesIO()
-        image.save(buf, format="JPEG", quality=20)
-        buf.seek(0)
-        return Image.open(buf).convert("RGB")
-    if kind == "brightness_0.4":
-        arr = np.asarray(image).astype(np.float32) * 0.4
-        return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
-    if kind == "brightness_1.8":
-        arr = np.asarray(image).astype(np.float32) * 1.8
-        return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
-    if kind == "salt_pepper_5pct":
-        arr = np.asarray(image).copy()
-        rng = np.random.default_rng(0)
-        mask = rng.random(arr.shape[:2])
-        arr[mask < 0.025] = 0
-        arr[mask > 0.975] = 255
-        return Image.fromarray(arr)
-    raise ValueError(f"Unknown degradation '{kind}'.")
-
-
 @torch.no_grad()
 def distribution_shift(
     model: nn.Module,
@@ -231,7 +195,7 @@ def distribution_shift(
         total = 0
         for filepath, label in test_samples:
             clean = Image.open(filepath).convert("RGB")
-            tensor = transform(_degrade(clean, kind)).unsqueeze(0).to(device)
+            tensor = transform(degrade(clean, kind)).unsqueeze(0).to(device)
             pred = int(model(tensor).argmax(dim=1).item())
             correct += int(pred == label)
             total += 1
@@ -283,22 +247,9 @@ def main() -> int:
     print(f"Using device: {device}")
 
     # Recreate the SAME test split train.py held out (deterministic given seed).
-    # Mirror train.py's single-vs-multi-dir handling so a model trained on a
-    # merged union is evaluated on the matching merged held-out split.
-    data_dirs = _normalize_data_dirs(args.data_dir)
-    if len(data_dirs) == 1:
-        class_names = get_class_names(data_dirs[0])
-        _train, _val, test_samples = make_stratified_splits(
-            data_dirs[0], seed=args.seed, class_names=class_names
-        )
-    else:
-        class_names = get_union_class_names(data_dirs)
-        merged: list[tuple[str, int]] = []
-        for d in data_dirs:
-            merged.extend(_list_samples(d, class_names))
-        _train, _val, test_samples = make_stratified_splits(
-            samples=merged, seed=args.seed, class_names=class_names
-        )
+    _train, _val, test_samples, class_names = recreate_splits(
+        args.data_dir, seed=args.seed
+    )
     print(f"Held-out test split: {len(test_samples)} samples.")
 
     test_ds = ASLDataset(

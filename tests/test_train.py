@@ -218,9 +218,11 @@ def test_main_multi_dir_merge_end_to_end(tmp_path, monkeypatch, capsys):
 
 
 def test_normalize_data_dirs_forms():
-    assert train._normalize_data_dirs("data/x") == ["data/x"]
-    assert train._normalize_data_dirs("a, b") == ["a", "b"]
-    assert train._normalize_data_dirs(["a", "b"]) == ["a", "b"]
+    from src.dataset import normalize_data_dirs
+
+    assert normalize_data_dirs("data/x") == ["data/x"]
+    assert normalize_data_dirs("a, b") == ["a", "b"]
+    assert normalize_data_dirs(["a", "b"]) == ["a", "b"]
 
 
 def test_main_transfer_with_warmup_and_resume(tmp_path, monkeypatch, capsys):

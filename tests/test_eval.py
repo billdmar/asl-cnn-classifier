@@ -64,6 +64,8 @@ def test_save_confusion_matrix(tmp_path):
 def test_degrade_variants():
     from PIL import Image
 
+    from src.degradations import degrade
+
     img = Image.new("RGB", (16, 16), (120, 130, 140))
     for kind in [
         "clean",
@@ -73,7 +75,7 @@ def test_degrade_variants():
         "brightness_1.8",
         "salt_pepper_5pct",
     ]:
-        out = evalmod._degrade(img, kind)
+        out = degrade(img, kind)
         assert out.size == (16, 16)
 
 
@@ -82,14 +84,16 @@ def test_degrade_unknown_raises():
 
     import pytest
 
+    from src.degradations import degrade
+
     img = Image.new("RGB", (8, 8))
     with pytest.raises(ValueError):
-        evalmod._degrade(img, "nope")
+        degrade(img, "nope")
 
 
 def test_distribution_shift_function():
     from src.dataset import get_class_names, make_stratified_splits
-    from src.infer_camera import load_checkpoint
+    from src.checkpoint import load_checkpoint
 
     data = _repo_path(DATA_DIR)
     class_names = get_class_names(data)

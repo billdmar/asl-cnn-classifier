@@ -21,7 +21,6 @@ of truth). Run::
 from __future__ import annotations
 
 import argparse
-import io
 import time
 from pathlib import Path
 from typing import Callable
@@ -32,7 +31,7 @@ matplotlib.use("Agg")  # headless backend — no display required.
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
-from PIL import Image, ImageFilter  # noqa: E402
+from PIL import Image  # noqa: E402
 from torch import nn  # noqa: E402
 from torchvision import transforms  # noqa: E402
 
@@ -44,10 +43,10 @@ from src.dataset import (  # noqa: E402
     get_eval_transforms,
     make_stratified_splits,
 )
-from src.infer_camera import load_checkpoint  # noqa: E402
+from src.checkpoint import DEFAULT_CHECKPOINT, load_checkpoint  # noqa: E402
+from src.degradations import degrade  # noqa: E402
 from src.utils import get_device, save_json  # noqa: E402
 
-DEFAULT_CHECKPOINT = "artifacts/checkpoints/best_model.pth"
 ARTIFACTS = Path("artifacts")
 WARMUP_FRAMES = 50
 
@@ -267,33 +266,6 @@ def _save_ablation_chart(ablation: list[dict[str, str | float]], path: Path) -> 
 # --------------------------------------------------------------------------- #
 # Distribution-shift characterization
 # --------------------------------------------------------------------------- #
-def _degrade(image: Image.Image, kind: str) -> Image.Image:
-    """Apply a synthetic degradation to a clean RGB PIL image."""
-    if kind == "clean":
-        return image
-    if kind == "gaussian_blur":
-        return image.filter(ImageFilter.GaussianBlur(radius=2.0))
-    if kind == "jpeg_q20":
-        buf = io.BytesIO()
-        image.save(buf, format="JPEG", quality=20)
-        buf.seek(0)
-        return Image.open(buf).convert("RGB")
-    if kind == "brightness_0.4":
-        arr = np.asarray(image).astype(np.float32) * 0.4
-        return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
-    if kind == "brightness_1.8":
-        arr = np.asarray(image).astype(np.float32) * 1.8
-        return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
-    if kind == "salt_pepper_5pct":
-        arr = np.asarray(image).copy()
-        rng = np.random.default_rng(0)
-        mask = rng.random(arr.shape[:2])
-        arr[mask < 0.025] = 0
-        arr[mask > 0.975] = 255
-        return Image.fromarray(arr)
-    raise ValueError(f"Unknown degradation '{kind}'.")
-
-
 @torch.no_grad()
 def _distribution_shift(
     model: nn.Module,
@@ -336,7 +308,7 @@ def _distribution_shift(
         total = 0
         for filepath, label in dataset.samples:
             clean = Image.open(filepath).convert("RGB")
-            degraded = _degrade(clean, kind)
+            degraded = degrade(clean, kind)
             tensor = transform(degraded).unsqueeze(0).to(device)
             pred = int(model(tensor).argmax(dim=1).item())
             correct += int(pred == label)
