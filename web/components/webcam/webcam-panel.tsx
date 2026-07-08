@@ -247,7 +247,26 @@ export function WebcamPanel() {
           {result && <ConfidenceBars ranked={result.ranked} unsure={showUnsure} />}
 
           {result && (
-            <ShareButton result={result} className="self-start" />
+            <div className="flex items-center gap-2">
+              <ShareButton result={result} className="self-start" />
+              {isActive && (
+                <button
+                  onClick={() => {
+                    if (!videoRef.current) return;
+                    const canvas = document.createElement("canvas");
+                    canvas.width = videoRef.current.videoWidth;
+                    canvas.height = videoRef.current.videoHeight;
+                    canvas.getContext("2d")?.drawImage(videoRef.current, 0, 0);
+                    const dataUrl = canvas.toDataURL("image/png");
+                    document.getElementById("explainer")?.scrollIntoView({ behavior: "smooth" });
+                    window.dispatchEvent(new CustomEvent("explain-image", { detail: { src: dataUrl } }));
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border-subtle px-3 py-1.5 text-sm text-fg-muted transition-colors hover:border-accent hover:text-accent"
+                >
+                  Freeze &amp; Explain
+                </button>
+              )}
+            </div>
           )}
 
           {confHistory.length > 1 && (

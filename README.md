@@ -32,6 +32,7 @@ same-dataset benchmark.*
 - [Quickstart](#quickstart)
 - [Key engineering decisions](#key-engineering-decisions)
 - [The honest-accuracy story](#the-honest-accuracy-story)
+- [Interactive explainer](#see-what-the-model-sees)
 - [Highlights](#highlights)
 - [Results](#results)
 - [Reproducing the deployed model](#reproducing-the-deployed-model-555-honest-cross-dataset)
@@ -170,6 +171,9 @@ code, never hardcoded.*
 - **Live in-browser web app** — Next.js + TypeScript running MobileNetV2 **100%
   client-side** (onnxruntime-web + MediaPipe), deployed to Vercel as an installable,
   offline-capable PWA. Webcam frames never leave the device.
+- **Interactive inference explainer** — freeze any frame and step through the pipeline:
+  hand detection, 128×128 crop, ImageNet-normalized tensor channels, and a temperature
+  slider that reshapes the probability distribution in real time.
 - **Honest accuracy, fully investigated** — the deploy decider is a held-out *cross-dataset*
   gate (55.5% / 59.8% A–Y), not the leakage-inflated 96.9% benchmark; every rejected lever is
   documented as a negative result to a formal closure.

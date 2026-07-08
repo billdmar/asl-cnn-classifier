@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +57,15 @@ export function ExplainerPanel() {
     setActiveStep(1);
     setError(null);
   }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const src = (e as CustomEvent<{ src: string }>).detail.src;
+      if (src) runExample(src);
+    };
+    window.addEventListener("explain-image", handler);
+    return () => window.removeEventListener("explain-image", handler);
+  }, [runExample]);
 
   if (!snapshot) {
     return (

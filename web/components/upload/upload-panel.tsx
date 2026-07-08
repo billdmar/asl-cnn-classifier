@@ -425,7 +425,19 @@ export function UploadPanel() {
                   unsure={outcome.verdict.unsure}
                 />
 
-                <ShareButton result={outcome.result} className="self-start" />
+                <div className="flex items-center gap-2">
+                  <ShareButton result={outcome.result} className="self-start" />
+                  <button
+                    onClick={() => {
+                      const el = document.getElementById("explainer");
+                      el?.scrollIntoView({ behavior: "smooth" });
+                      window.dispatchEvent(new CustomEvent("explain-image", { detail: { src: previewUrl } }));
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border-subtle px-3 py-1.5 text-sm text-fg-muted transition-colors hover:border-accent hover:text-accent"
+                  >
+                    Explain this &rarr;
+                  </button>
+                </div>
 
                 {trueLabel && GRADCAM_LABELS.has(trueLabel) && (
                   <div className="border-t border-border-subtle pt-3">
