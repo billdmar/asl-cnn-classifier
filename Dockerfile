@@ -15,7 +15,7 @@ RUN apt-get update \
 # CUDA wheels), then install the project from pyproject.toml which resolves the
 # remaining dependencies from PyPI. Copy only the build metadata first for
 # Docker layer caching — dependencies change far less often than source code.
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 COPY src/__init__.py src/__init__.py
 RUN pip install --no-cache-dir \
         --index-url https://download.pytorch.org/whl/cpu \
