@@ -17,9 +17,12 @@ Each degradation mimics a realistic failure mode:
 from __future__ import annotations
 
 import io
+from typing import Callable
 
 import numpy as np
+import torch
 from PIL import Image, ImageFilter
+from torch import nn
 
 DEGRADATION_KINDS: tuple[str, ...] = (
     "clean",
@@ -67,3 +70,35 @@ def degrade(image: Image.Image, kind: str) -> Image.Image:
         arr[mask > 0.975] = 255
         return Image.fromarray(arr)
     raise ValueError(f"Unknown degradation '{kind}'.")
+
+
+@torch.no_grad()
+def measure_shift(
+    model: nn.Module,
+    samples: list[tuple[str, int]],
+    transform: Callable[[Image.Image], torch.Tensor],
+    device: torch.device,
+) -> dict[str, float]:
+    """Measure accuracy under each synthetic degradation.
+
+    Args:
+        model: The classifier in eval mode.
+        samples: List of (filepath, label_index) tuples.
+        transform: Preprocessing transform (e.g. from get_eval_transforms).
+        device: Compute device.
+
+    Returns:
+        Mapping of degradation name to accuracy in [0, 1].
+    """
+    results: dict[str, float] = {}
+    for kind in DEGRADATION_KINDS:
+        correct = 0
+        total = 0
+        for filepath, label in samples:
+            clean = Image.open(filepath).convert("RGB")
+            tensor = transform(degrade(clean, kind)).unsqueeze(0).to(device)
+            pred = int(model(tensor).argmax(dim=1).item())
+            correct += int(pred == label)
+            total += 1
+        results[kind] = (correct / total) if total > 0 else 0.0
+    return results

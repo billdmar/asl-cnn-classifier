@@ -27,12 +27,10 @@ dependencies = [
     "tensorboard>=2.15,<3.0",
     "PyYAML>=6.0,<7.0",
     "pillow>=10.0,<12.0",
-    "tqdm>=4.66,<5.0",
     "onnxruntime>=1.18,<2.0",
     "fastapi>=0.110,<1.0",
     "uvicorn>=0.29,<1.0",
     "python-multipart>=0.0.9,<1.0",
-    "kaggle>=1.6,<2.0",
     "datasets>=2.19,<4.0",
 ]
 
@@ -51,6 +49,7 @@ dev = [
 ]
 demo = ["gradio>=4.0,<6.0"]
 handcrop = ["mediapipe>=0.10,<0.11"]
+kaggle = ["kaggle>=1.6,<2.0"]
 
 [project.urls]
 Homepage = "https://github.com/billdmar/asl-cnn-classifier"

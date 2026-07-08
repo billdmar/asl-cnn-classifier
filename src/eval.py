@@ -37,7 +37,6 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import seaborn as sns  # noqa: E402
 import torch  # noqa: E402
-from PIL import Image  # noqa: E402
 from sklearn.metrics import classification_report, confusion_matrix  # noqa: E402
 from torch import nn  # noqa: E402
 from torch.utils.data import DataLoader  # noqa: E402
@@ -48,7 +47,6 @@ from src.dataset import (  # noqa: E402
     recreate_splits,
 )
 from src.checkpoint import DEFAULT_CHECKPOINT, load_checkpoint  # noqa: E402
-from src.degradations import degrade  # noqa: E402
 from src.utils import get_device, save_json, set_seed  # noqa: E402
 
 ARTIFACTS = Path("artifacts")
@@ -165,53 +163,24 @@ def save_per_class_errors(pairs: list[dict[str, Any]], path: Path) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-@torch.no_grad()
 def distribution_shift(
     model: nn.Module,
     test_samples: list[tuple[str, int]],
     device: torch.device,
 ) -> dict[str, float]:
-    """Measure test accuracy under each of the five synthetic degradations.
+    """Measure test accuracy under each synthetic degradation.
 
-    This is a self-contained basic version of the robustness study; the
-    canonical implementation lives in ``benchmark.py``.
-
-    Returns:
-        Mapping of degradation name → accuracy in ``[0, 1]`` (``0.0`` if the
-        test split is empty, matching ``zero_division=0`` semantics).
+    Delegates to :func:`src.degradations.measure_shift`.
     """
-    transform = get_eval_transforms()
-    degradations = [
-        "clean",
-        "gaussian_blur",
-        "jpeg_q20",
-        "brightness_0.4",
-        "brightness_1.8",
-        "salt_pepper_5pct",
-    ]
-    results: dict[str, float] = {}
-    for kind in degradations:
-        correct = 0
-        total = 0
-        for filepath, label in test_samples:
-            clean = Image.open(filepath).convert("RGB")
-            tensor = transform(degrade(clean, kind)).unsqueeze(0).to(device)
-            pred = int(model(tensor).argmax(dim=1).item())
-            correct += int(pred == label)
-            total += 1
-        results[kind] = (correct / total) if total > 0 else 0.0
-    return results
+    from src.degradations import measure_shift
+
+    return measure_shift(model, test_samples, get_eval_transforms(), device)
 
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Evaluate the ASL classifier on the test split."
-    )
-    parser.add_argument(
-        "--config",
-        default=None,
-        help="Optional training-config YAML/JSON (unused for eval logic).",
     )
     parser.add_argument(
         "--checkpoint", default=DEFAULT_CHECKPOINT, help="Path to model checkpoint."

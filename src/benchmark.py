@@ -44,7 +44,6 @@ from src.dataset import (  # noqa: E402
     make_stratified_splits,
 )
 from src.checkpoint import DEFAULT_CHECKPOINT, load_checkpoint  # noqa: E402
-from src.degradations import degrade  # noqa: E402
 from src.utils import get_device, save_json  # noqa: E402
 
 ARTIFACTS = Path("artifacts")
@@ -218,13 +217,10 @@ def _ablation(
             lat.append((time.perf_counter() - start) * 1000.0)
         return float(np.mean(lat))
 
+    full_ms = _time_pipeline(model, frames, device, full)
     results: list[dict[str, str | float]] = [
-        {"stage": "full", "mean_ms": _time_pipeline(model, frames, device, full)},
-        # ColorJitter is absent at eval — identical to full (documented no-op).
-        {
-            "stage": "skip_colorjitter",
-            "mean_ms": _time_pipeline(model, frames, device, full),
-        },
+        {"stage": "full", "mean_ms": full_ms},
+        {"stage": "skip_colorjitter", "mean_ms": full_ms},
         {
             "stage": "skip_resize",
             "mean_ms": _time_pipeline(model, frames, device, skip_resize),
@@ -266,7 +262,6 @@ def _save_ablation_chart(ablation: list[dict[str, str | float]], path: Path) -> 
 # --------------------------------------------------------------------------- #
 # Distribution-shift characterization
 # --------------------------------------------------------------------------- #
-@torch.no_grad()
 def _distribution_shift(
     model: nn.Module,
     test_dir: str,
@@ -276,45 +271,20 @@ def _distribution_shift(
     """Measure test accuracy under each synthetic degradation.
 
     Loads the held-out test split via ``make_stratified_splits`` + ``ASLDataset``
-    and classifies each test image after applying each degradation. Uses
-    ``zero_division=0`` semantics: if the test split is empty, accuracies are
-    reported as ``0.0`` rather than dividing by zero.
-
-    Returns:
-        Mapping of degradation name → accuracy in ``[0, 1]``.
+    and delegates to :func:`src.degradations.measure_shift`.
     """
-    transform = get_eval_transforms()
-    degradations = [
-        "clean",
-        "gaussian_blur",
-        "jpeg_q20",
-        "brightness_0.4",
-        "brightness_1.8",
-        "salt_pepper_5pct",
-    ]
+    from src.degradations import DEGRADATION_KINDS, measure_shift
 
+    transform = get_eval_transforms()
     try:
         _, _, test = make_stratified_splits(test_dir, class_names=class_names)
     except RuntimeError as exc:
         print(f"WARNING: distribution-shift skipped — {exc}")
-        return {k: 0.0 for k in degradations}
+        return {k: 0.0 for k in DEGRADATION_KINDS}
 
     dataset = ASLDataset(samples=test, transform=transform, class_names=class_names)
     print(f"Distribution-shift over {len(dataset)} held-out test images.")
-
-    results: dict[str, float] = {}
-    for kind in degradations:
-        correct = 0
-        total = 0
-        for filepath, label in dataset.samples:
-            clean = Image.open(filepath).convert("RGB")
-            degraded = degrade(clean, kind)
-            tensor = transform(degraded).unsqueeze(0).to(device)
-            pred = int(model(tensor).argmax(dim=1).item())
-            correct += int(pred == label)
-            total += 1
-        results[kind] = (correct / total) if total > 0 else 0.0  # zero_division=0
-    return results
+    return measure_shift(model, dataset.samples, transform, device)
 
 
 # --------------------------------------------------------------------------- #
