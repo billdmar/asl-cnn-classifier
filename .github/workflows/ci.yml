@@ -21,7 +21,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          cache-dependency-glob: "requirements*.txt"
+          cache-dependency-glob: "pyproject.toml"
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
@@ -29,7 +29,7 @@ jobs:
       - name: Create venv and install dependencies
         run: |
           uv venv --python ${{ matrix.python-version }}
-          uv pip install -r requirements-dev.txt
+          uv pip install -e ".[dev]"
 
       - name: Lint (ruff + black)
         run: |
