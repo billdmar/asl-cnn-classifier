@@ -9,22 +9,12 @@
 ![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![ONNX Runtime](https://img.shields.io/badge/ONNX_Runtime-web-005CED?logo=onnx&logoColor=white)
-![PyTorch](https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white)
-![Coverage](https://img.shields.io/badge/coverage-96%25%20(CI%20gate%20%E2%89%A580%25)-brightgreen)
-![License](https://img.shields.io/badge/License-MIT-green)
 
-A polished Next.js + TypeScript site runs a MobileNetV2 ASL classifier **100% in the
-browser** via onnxruntime-web + MediaPipe hand-crop — live webcam frames never leave your
-device. It ships as an installable, offline-capable PWA with IndexedDB model caching,
-shareable result permalinks, a dark/light theme, keyboard shortcuts, and an interactive
-metrics dashboard wired to real, reproducible artifacts. Behind it sits the full
-ML-engineering lifecycle: training, ONNX export with a cross-language preprocessing-parity
-gate, calibration, benchmarking, and CI (TypeScript-strict, unit + parity + Playwright E2E +
-Lighthouse budget). The defining engineering decision is **intellectual honesty about
-accuracy**: the headline number is **55.5% cross-dataset (59.8% on the static A–Y letters)**
-on data the model never trained on — *not* the leakage-inflated 96.9% same-dataset figure —
-with every accuracy lever I tried and rejected documented to a formal "supply-exhausted"
-closure.
+MobileNetV2 classifies ASL alphabet letters **entirely in the browser** via ONNX Runtime Web + MediaPipe hand-crop — webcam frames never leave the device. The full ML lifecycle ships behind it: PyTorch training, ONNX export with a cross-language parity gate, calibration, and CI.
+
+- **Installable PWA** — offline-capable, IndexedDB model cache, dark/light theme, keyboard shortcuts
+- **Honest accuracy** — headline is **55.5% cross-dataset** (59.8% on static A–Y), not the leakage-inflated 96.9% same-dataset figure; every accuracy lever tried and rejected is documented
+- **CI-verified** — TypeScript strict, unit + parity + Playwright E2E, Lighthouse budget (perf 98 / a11y 96)
 
 ![ASL Classifier — live in-browser web app](docs/web-hero.png)
 
