@@ -10,7 +10,7 @@ import { Reveal } from "@/components/ui/reveal";
 // assets only load once the section nears the viewport (or after an idle
 // fallback), keeping them off the hero's LCP critical path.
 // See components/home-sections.tsx and components/lazy-visible.tsx.
-import { MetricsDashboard, UploadPanel, WebcamPanel } from "@/components/home-sections";
+import { ExplainerPanel, MetricsDashboard, UploadPanel, WebcamPanel } from "@/components/home-sections";
 
 interface SectionShellProps {
   id: string;
@@ -67,6 +67,18 @@ export default function HomePage() {
               placeholder={<SkeletonCard minHeight={360} label="Loading upload panel" />}
             >
               <UploadPanel />
+            </LazyVisible>
+          </SectionShell>
+
+          <SectionShell
+            id="explainer"
+            title="See what the model sees"
+            blurb="Freeze a frame and step through the inference pipeline: hand detection, crop, tensor normalization, and the final prediction. Drag the temperature slider to watch the probability distribution reshape in real time."
+          >
+            <LazyVisible
+              placeholder={<SkeletonCard minHeight={480} label="Loading explainer" />}
+            >
+              <ExplainerPanel />
             </LazyVisible>
           </SectionShell>
 
