@@ -1,0 +1,45 @@
+# Training configuration — 224x224 resolution experiment.
+#
+# Identical to the deployed D3 config (train_real_mobilenet_diverse_hemg.yaml)
+# with ONE change: image_size 128 -> 224. MobileNetV2 was pretrained on 224x224
+# inputs; using the native resolution preserves spatial detail in fine-grained
+# hand-sign distinctions (S/T, M/N, A/E confusion pairs differ by single-finger
+# position). This is the single largest untried lever for cross-dataset accuracy.
+#
+# All other hyperparams held constant to isolate the resolution variable.
+
+# Data — same 3-source union as deployed.
+data_dir:
+  - data/asl_real
+  - data/asl_diverse
+  - data/asl_hemg
+image_size: 224
+train_frac: 0.70
+val_frac: 0.15
+test_frac: 0.15
+
+# Model
+arch: mobilenet_v2
+num_classes: 26
+pretrained: true
+
+# Optimization (deployed recipe, unchanged)
+batch_size: 32
+num_epochs: 12
+learning_rate: 0.001
+weight_decay: 0.0001
+optimizer: adamw
+lr_scheduler: cosine
+warmup_epochs: 3
+
+# Training behavior
+seed: 42
+num_workers: 4
+amp: false
+early_stopping_patience: 5
+device: auto
+augmentation: standard
+
+# Output — separate dir; never clobber the deployed checkpoint.
+checkpoint_dir: artifacts/checkpoints_224
+tensorboard_dir: artifacts/runs_224
