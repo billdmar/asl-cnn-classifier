@@ -78,9 +78,22 @@ training data, no architectural or preprocessing lever improves the honest numbe
 The only path to higher accuracy remains acquiring genuinely diverse additional
 training data.
 
+## Replication run (2026-07-08, resumed weights)
+
+A second run starting from the epoch-3 warm-up checkpoint (to verify the result
+is stable, not a random-seed artifact) produced slightly different numbers but
+the same verdict:
+
+| Metric | 128×128 (deployed) | 224×224 (run 2) | Delta |
+|--------|-------------------|-----------------|-------|
+| Accuracy (26-class) | **55.5%** | 53.2% | **−2.3 pts** |
+| Accuracy (A–Y) | **59.8%** | 57.7% | **−2.1 pts** |
+| Val accuracy | 96.9% | 98.5% | +1.6 pts |
+
+Same pattern: higher same-dataset val, lower cross-dataset. **Verdict confirmed.**
+
 ## Artifacts
 
 - Config: `configs/train_real_mobilenet_diverse_hemg_224.yaml`
-- Checkpoint: `artifacts/checkpoints_224/best_model.pth` (99.15% val, NOT deployed)
+- Checkpoint: `artifacts/checkpoints_224/best_model.pth` (NOT deployed)
 - Eval JSON: `artifacts/realworld_eval_224.json`
-- Training log: `artifacts/train_224.log`
