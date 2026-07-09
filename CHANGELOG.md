@@ -9,6 +9,39 @@ labelled "same-dataset".
 
 _Nothing yet._
 
+## [1.1.0] — 2026-07-08
+
+Accuracy unchanged (**55.5% cross-dataset / 59.8% A–Y**). This release adds an
+interactive inference explainer, a code-quality overhaul, and documents the
+224×224 resolution experiment (rejected: −3.7 pts).
+
+### Added
+
+- **Interactive inference explainer** — a step-by-step visualization of the
+  preprocessing pipeline (raw frame → hand detection → crop → resize → normalize
+  → tensor → ONNX → softmax → prediction), accessible from both the webcam
+  ("Freeze & Explain") and upload ("Explain this") panels. Includes a temperature
+  slider to explore calibration effects interactively.
+- **224×224 resolution experiment** — trained MobileNetV2 at its native input
+  resolution. Same-dataset val improved to 99.15% (+2.35 pts), but cross-dataset
+  accuracy worsened (−3.7 pts). Documented in `docs/EXPERIMENT_resolution_224.md`
+  — further confirms the supply-exhausted closure.
+
+### Changed
+
+- **Code quality overhaul** (PR #29):
+  - Extract `src/checkpoint.py` and `src/degradations.py` (shared modules)
+  - Consolidate `distribution_shift` duplication into `measure_shift()`
+  - Remove unused `tqdm` dep; move `kaggle` to optional extra
+  - Delete dead code (unused functions, dead CLI args, no-op benchmark stage)
+  - Consolidate requirements into PEP 621 `pyproject.toml`
+  - Extract `useWebcamLoop` custom hook from 700-line webcam-panel (→ 408 + 426)
+- README opening rewritten for scannability (wall-of-text → bullets)
+
+### Fixed
+
+- Dockerfile `pip install .` now copies README.md early (hatchling metadata)
+
 ## [1.0.0] — 2026-06-29
 
 Headline accuracy is **55.5% cross-dataset (26-class)** / **59.8% A–Y**; the
