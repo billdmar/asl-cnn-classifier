@@ -3,7 +3,7 @@
 
 PY := .venv/bin/python
 
-.PHONY: install download-real download-crossval download-diverse download-hemg sample-train train train-real eval eval-real eval-realworld precrop precrop-clean train-cropped train-cropped-midaug train-cropped-clean eval-realworld-cropped eval-realworld-cropped-midaug eval-realworld-cropped-clean check-overlap train-diverse eval-realworld-diverse train-diverse-midaug eval-realworld-diverse-midaug check-overlap-hemg train-diverse-hemg eval-realworld-diverse-hemg train-diverse-hemg-balanced eval-realworld-diverse-hemg-balanced train-diverse-hemg-mnv3 eval-realworld-diverse-hemg-mnv3 train-diverse-hemg-effb0 eval-realworld-diverse-hemg-effb0 train-diverse-hemg-swa eval-realworld-diverse-hemg-swa reproduce-deployed gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format install-hooks gradcam-web mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun clean
+.PHONY: install download-real download-crossval download-diverse download-hemg sample-train train train-real eval eval-real eval-realworld precrop precrop-clean train-cropped train-cropped-midaug train-cropped-clean eval-realworld-cropped eval-realworld-cropped-midaug eval-realworld-cropped-clean check-overlap train-diverse eval-realworld-diverse train-diverse-midaug eval-realworld-diverse-midaug check-overlap-hemg train-diverse-hemg eval-realworld-diverse-hemg train-diverse-hemg-balanced eval-realworld-diverse-hemg-balanced train-diverse-hemg-mnv3 eval-realworld-diverse-hemg-mnv3 train-diverse-hemg-effb0 eval-realworld-diverse-hemg-effb0 train-diverse-hemg-swa eval-realworld-diverse-hemg-swa reproduce-deployed gradcam calibration benchmark benchmark-backends export-onnx quantize serve camera test lint format install-hooks gradcam-web mypy typecheck docker-build docker-run docker-test deploy-hf deploy-hf-dryrun record-demo clean
 
 # Target Hugging Face Space, e.g. `export HF_SPACE=you/asl-cnn-classifier`.
 HF_SPACE ?=
@@ -262,6 +262,12 @@ deploy-hf:
 # Preview what WOULD be uploaded and the resolved Space URL — no token, no network.
 deploy-hf-dryrun:
 	$(PY) scripts/deploy_hf.py --space-id $(HF_SPACE) --sdk gradio --dry-run
+
+# Record an animated demo of the explainer flow (requires Playwright + a browser).
+# Outputs docs/demo.webm; convert to GIF with:
+#   ffmpeg -i docs/demo.webm -vf "fps=12,scale=800:-1:flags=lanczos" -loop 0 docs/demo.gif
+record-demo:
+	cd web && npm run build && node scripts/record-demo.mjs
 
 # Remove generated artifacts (keeping .gitkeep) and bytecode caches.
 clean:
