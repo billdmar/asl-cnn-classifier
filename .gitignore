@@ -40,6 +40,8 @@ data/*
 *.swp
 
 # ─── Node / web (the web/ subproject manages its own build dirs) ─
+/package.json
+/package-lock.json
 node_modules/
 .playwright-mcp/
 web/node_modules/

@@ -6,6 +6,7 @@
 
 [![Live demo](https://img.shields.io/badge/Live_demo-asl--cnn--classifier.vercel.app-000000?logo=vercel&logoColor=white)](https://asl-cnn-classifier.vercel.app)
 [![CI](https://github.com/billdmar/asl-cnn-classifier/actions/workflows/ci.yml/badge.svg)](https://github.com/billdmar/asl-cnn-classifier/actions/workflows/ci.yml)
+[![Deploy](https://github.com/billdmar/asl-cnn-classifier/actions/workflows/deploy.yml/badge.svg)](https://github.com/billdmar/asl-cnn-classifier/actions/workflows/deploy.yml)
 ![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![ONNX Runtime](https://img.shields.io/badge/ONNX_Runtime-web-005CED?logo=onnx&logoColor=white)
@@ -163,6 +164,22 @@ written up as a negative result. The investigation closes formally at a document
 *The live metrics dashboard: the honest cross-dataset numbers, the 33→47→55 diversity
 trajectory, and the real 26×26 confusion matrix — every value produced by reproducible repo
 code, never hardcoded.*
+
+---
+
+## See what the model sees
+
+The live app includes an interactive inference explainer — freeze any frame from
+the webcam ("Freeze & Explain") or an uploaded image ("Explain this") and step
+through the full pipeline:
+
+1. **Raw frame** → 2. **Hand detection** (crop box overlay) → 3. **128×128 crop** →
+4. **Tensor channels** (ImageNet-normalized R/G/B heatmaps) → 5. **Prediction**
+with a temperature slider that reshapes the probability distribution in real time.
+
+Logits are cached from a single ONNX forward pass; the temperature slider reshapes
+the softmax distribution at O(26) arithmetic — instant, no re-inference. This
+demonstrates ML transparency: not just what the model predicts, but how it gets there.
 
 ---
 
