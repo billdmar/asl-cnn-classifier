@@ -65,7 +65,9 @@ const server = createServer(async (req, res) => {
 await new Promise((resolve) => server.listen(PORT, resolve));
 console.log(`Serving ${OUT_DIR}/ on http://localhost:${PORT}`);
 
-const browser = await chromium.launch();
+// channel:"chromium" uses the full Chromium build (new headless) rather than
+// the separate headless-shell download, which may not be installed.
+const browser = await chromium.launch({ channel: "chromium" });
 const context = await browser.newContext({
   viewport: { width: 1280, height: 800 },
   recordVideo: { dir: VIDEO_DIR, size: { width: 1280, height: 800 } },
