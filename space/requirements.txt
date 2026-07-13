@@ -10,14 +10,14 @@
 # Gradio 5.x: compatible with huggingface_hub 1.x and modern starlette/fastapi.
 # (Gradio 4.44 broke on Spaces: it imports the removed `HfFolder`, and its
 # pinned starlette raised "argument of type 'bool' is not iterable" on boot.)
-gradio>=5.49,<6.0
+gradio>=5.49,<7.0
 torch>=2.2,<3.0
 torchvision>=0.17,<1.0
-pillow>=10.0,<12.0
-numpy>=1.26,<2.2
+pillow>=10.0,<13.0
+numpy>=1.26,<2.5
 PyYAML>=6.0,<7.0
 # Imported transitively at app import time: src.infer_camera imports cv2 and
 # src.dataset imports scikit-learn, so the Space needs both to boot. Headless
 # OpenCV avoids GUI/X11 system libraries that aren't present on Spaces.
-opencv-python-headless>=4.8,<5.0
+opencv-python-headless>=4.8,<6.0
 scikit-learn>=1.3,<2.0
