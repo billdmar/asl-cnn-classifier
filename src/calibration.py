@@ -17,7 +17,7 @@ analytic ECE (see ``tests/test_calibration.py``).
 
 Preprocessing reuses :func:`src.dataset.get_eval_transforms`, the held-out split
 reuses :func:`src.dataset.make_stratified_splits`, and checkpoint loading reuses
-:func:`src.infer_camera.load_checkpoint`.
+:func:`src.checkpoint.load_checkpoint`.
 
 CRITICAL HONESTY NOTE: with no trained checkpoint, ``load_checkpoint`` falls
 back to a RANDOM-init model over the tiny synthetic ``data/sample`` fixture, so

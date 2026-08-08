@@ -1,6 +1,6 @@
 """Export a trained (or random-init fallback) model to ONNX.
 
-The model is loaded via :func:`src.infer_camera.load_checkpoint`, so this script
+The model is loaded via :func:`src.checkpoint.load_checkpoint`, so this script
 runs even before a real checkpoint exists (it falls back to an UNTRAINED
 ``custom_cnn`` and prints a clear warning — see ``load_checkpoint``). The export
 uses a **dynamic batch axis** with a fixed ``3×128×128`` spatial input, matching

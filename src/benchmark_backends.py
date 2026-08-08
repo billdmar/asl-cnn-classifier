@@ -16,7 +16,7 @@ throughput (FPS). Preprocessing reuses :func:`src.dataset.get_eval_transforms`
 comparison is apples-to-apples.
 
 Results are written to ``artifacts/backend_benchmark.json`` and printed as a
-markdown table. The model loads via :func:`src.infer_camera.load_checkpoint`
+markdown table. The model loads via :func:`src.checkpoint.load_checkpoint`
 (random-init fallback when no checkpoint exists).
 
 Run::

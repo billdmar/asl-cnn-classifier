@@ -12,7 +12,7 @@ writes the full evaluation artifact set:
 * ``artifacts/per_class_errors.txt`` — the top-10 most-confused class pairs.
 
 Preprocessing reuses :func:`src.dataset.get_eval_transforms` and checkpoint
-loading reuses :func:`src.infer_camera.load_checkpoint`, so there is no second
+loading reuses :func:`src.checkpoint.load_checkpoint`, so there is no second
 copy of either piece of logic.
 
 NOTE: accuracy on the tiny committed ``data/sample`` fixture is only a wiring

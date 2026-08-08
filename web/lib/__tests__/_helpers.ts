@@ -8,6 +8,7 @@
 
 import path from "node:path";
 import sharp from "sharp";
+import type { KernelEnum } from "sharp";
 
 /** Absolute path to the committed golden-fixtures directory. */
 export const GOLDEN_DIR = path.resolve(__dirname, "..", "..", "test-fixtures", "golden");
@@ -65,7 +66,7 @@ export async function decodeResizedRgb(filePath: string): Promise<Buffer> {
 export async function decodeAndResizeRgb(
   filePath: string,
   size: number,
-  kernel: keyof sharp.KernelEnum,
+  kernel: keyof KernelEnum,
 ): Promise<Buffer> {
   return sharp(filePath)
     .resize(size, size, { kernel, fit: "fill" })

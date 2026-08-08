@@ -32,14 +32,22 @@ dependencies = [
     "uvicorn>=0.29,<1.0",
     "python-multipart>=0.0.9,<1.0",
     "datasets>=2.19,<6.0",
+    # Imported directly by src/download_hf_data.py (snapshot_download). It also
+    # ships transitively with `datasets`, but declare it explicitly since we
+    # import it by name rather than relying on the transitive pin.
+    "huggingface_hub>=0.23,<1.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0,<10.0",
     "pytest-cov>=5.0,<8.0",
-    "black>=24.0,<27.0",
-    "ruff>=0.5,<1.0",
+    # Pinned exactly: ruff/black lint output changes between releases, so an
+    # unpinned range lets a newer release fail CI on code that was green (a
+    # newer ruff enabled import-sorting + new lint rules that the range silently
+    # pulled in). Pinning keeps CI reproducible; bump deliberately via dependabot.
+    "black==24.4.2",
+    "ruff==0.5.7",
     "mypy>=1.8,<3.0",
     "pre-commit>=3.7,<5.0",
     "onnx>=1.16,<2.0",
