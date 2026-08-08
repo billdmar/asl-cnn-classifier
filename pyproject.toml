@@ -35,7 +35,7 @@ dependencies = [
     # Imported directly by src/download_hf_data.py (snapshot_download). It also
     # ships transitively with `datasets`, but declare it explicitly since we
     # import it by name rather than relying on the transitive pin.
-    "huggingface_hub>=0.23,<1.0",
+    "huggingface_hub>=0.23,<2.0",
 ]
 
 [project.optional-dependencies]
@@ -46,8 +46,8 @@ dev = [
     # unpinned range lets a newer release fail CI on code that was green (a
     # newer ruff enabled import-sorting + new lint rules that the range silently
     # pulled in). Pinning keeps CI reproducible; bump deliberately via dependabot.
-    "black==24.4.2",
-    "ruff==0.5.7",
+    "black==26.5.1",
+    "ruff==0.16.1",
     "mypy>=1.8,<3.0",
     "pre-commit>=3.7,<5.0",
     "onnx>=1.16,<2.0",
@@ -56,7 +56,7 @@ dev = [
     "types-PyYAML>=6.0,<7.0",
 ]
 demo = ["gradio>=4.0,<7.0"]
-handcrop = ["mediapipe>=0.10,<0.11"]
+handcrop = ["mediapipe>=0.10,<1.1"]
 kaggle = ["kaggle>=1.6,<3.0"]
 
 [project.urls]
