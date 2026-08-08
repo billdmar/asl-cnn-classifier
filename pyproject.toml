@@ -46,8 +46,8 @@ dev = [
     # unpinned range lets a newer release fail CI on code that was green (a
     # newer ruff enabled import-sorting + new lint rules that the range silently
     # pulled in). Pinning keeps CI reproducible; bump deliberately via dependabot.
-    "black==26.5.1",
-    "ruff==0.16.1",
+    "black==24.4.2",
+    "ruff==0.5.7",
     "mypy>=1.8,<3.0",
     "pre-commit>=3.7,<5.0",
     "onnx>=1.16,<2.0",
