@@ -9,7 +9,7 @@ does not support ``nn.Conv2d`` (that requires static/QAT flows), so we quantize
 
 The script then measures the **real on-disk size** (bytes) of the FP32 vs. INT8
 ``state_dict`` serializations and writes them to ``artifacts/quantization.json``.
-The model is loaded via :func:`src.infer_camera.load_checkpoint`, so it runs with
+The model is loaded via :func:`src.checkpoint.load_checkpoint`, so it runs with
 the random-init fallback when no checkpoint exists.
 
 Example::

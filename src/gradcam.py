@@ -23,7 +23,7 @@ MobileNetV2 backbone. Any other module that exposes a ``features`` Sequential
 with at least one ``Conv2d`` degrades gracefully through the same path.
 
 Preprocessing reuses :func:`src.dataset.get_eval_transforms` and checkpoint
-loading reuses :func:`src.infer_camera.load_checkpoint`, so there is no second
+loading reuses :func:`src.checkpoint.load_checkpoint`, so there is no second
 copy of either piece of logic.
 
 CRITICAL HONESTY NOTE: with no trained checkpoint, ``load_checkpoint`` falls
@@ -69,11 +69,12 @@ SAMPLE_DATA_NOTE = (
 def find_target_layer(model: nn.Module) -> nn.Conv2d:
     """Return the last ``nn.Conv2d`` inside the model's ``features`` block.
 
-    Handles :class:`~src.model.CustomCNN` (``model.features``) and the
-    :class:`~src.model.TransferModel` MobileNetV2 backbone
-    (``model.backbone.features``). Falls back to the last ``Conv2d`` anywhere in
-    the model if no ``features`` Sequential is found, so callers degrade
-    gracefully rather than crashing.
+    Handles :class:`~src.model.CustomCNN` (``model.features``) and any
+    :class:`~src.model.TransferModel` backbone exposing a ``features`` block
+    (``model.backbone.features`` — e.g. MobileNetV2/V3, EfficientNet-B0). Falls
+    back to the last ``Conv2d`` anywhere in the model when no ``features``
+    Sequential is found (e.g. ResNet18), so callers degrade gracefully rather
+    than crashing.
 
     Raises:
         ValueError: If the model contains no ``nn.Conv2d`` at all.

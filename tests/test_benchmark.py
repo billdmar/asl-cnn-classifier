@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import os
 
-import numpy as np
 import torch
 
 from src import benchmark as bench
@@ -143,4 +142,6 @@ def test_main_with_synthetic_frames(tmp_path, monkeypatch):
         ),
     )
     assert bench.main() == 0
-    assert isinstance(np.float64(1.0), np.floating)  # numpy import sanity
+    # The synthetic-frame branch still runs the full latency benchmark and
+    # writes its results artifact under the (chdir'd) tmp working dir.
+    assert (tmp_path / "artifacts" / "benchmark_results.json").exists()

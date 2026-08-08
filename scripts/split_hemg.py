@@ -8,7 +8,7 @@ files, deterministically (seed 42) so the split is reproducible and auditable.
 
 It copies image files into ``<out_prefix>_train/<CLASS>/`` and
 ``<out_prefix>_gate/<CLASS>/`` and writes a manifest. Class-stratified at the
-file level (reuses :func:`src.dataset.make_stratified_splits`), so each class is
+file level (via scikit-learn's ``StratifiedShuffleSplit``), so each class is
 represented in both partitions in the same proportion.
 
 CRITICAL follow-up: run ``scripts/check_eval_overlap.py`` between the two

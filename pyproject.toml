@@ -32,6 +32,10 @@ dependencies = [
     "uvicorn>=0.29,<1.0",
     "python-multipart>=0.0.9,<1.0",
     "datasets>=2.19,<6.0",
+    # Imported directly by src/download_hf_data.py (snapshot_download). It also
+    # ships transitively with `datasets`, but declare it explicitly since we
+    # import it by name rather than relying on the transitive pin.
+    "huggingface_hub>=0.23,<1.0",
 ]
 
 [project.optional-dependencies]

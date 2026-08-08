@@ -6,8 +6,9 @@ Two architectures are exposed through the :func:`build_model` factory:
   scratch on 3×128×128 inputs. Global average pooling (rather than a large
   flattened dense layer) keeps the parameter count low while preserving the
   four convolutional stages.
-* :class:`TransferModel` — wraps a torchvision backbone (``mobilenet_v2`` or
-  ``resnet18``) with a fresh classifier head and exposes
+* :class:`TransferModel` — wraps a torchvision backbone (``mobilenet_v2``,
+  ``resnet18``, ``mobilenet_v3_small``, or ``efficientnet_b0``) with a fresh
+  classifier head and exposes
   :meth:`TransferModel.freeze_backbone` / :meth:`TransferModel.unfreeze_backbone`
   for the freeze-then-fine-tune training schedule.
 
@@ -105,7 +106,8 @@ class TransferModel(nn.Module):
     freeze-then-fine-tune schedule.
 
     Args:
-        arch: ``"mobilenet_v2"`` or ``"resnet18"``.
+        arch: one of ``"mobilenet_v2"``, ``"resnet18"``,
+            ``"mobilenet_v3_small"``, or ``"efficientnet_b0"``.
         num_classes: Number of output logits.
         pretrained: If ``True``, load ImageNet weights via the modern
             ``weights=`` API; otherwise initialize randomly.

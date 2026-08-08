@@ -45,6 +45,13 @@ learn finer features from the training data.
 | Macro F1 (A–Y) | 0.577 | 0.556 | −0.021 |
 | No-hand fallbacks | 61/712 | 61/712 | same |
 
+> Note: the deployed macro-F1 re-measured for this experiment (0.533 / 0.577)
+> is marginally below the headline figures quoted in `README.md` / `MODEL_CARD.md`
+> (0.548 / 0.603). Accuracy is identical (55.5% / 59.8%) — the small F1 gap is
+> run-to-run measurement variation, not a different model. The comparison in this
+> table (128×128 vs 224×224) is internally consistent because both columns were
+> measured in the same run.
+
 ## Interpretation
 
 The 224×224 model **overfits more aggressively** to the training domain's visual

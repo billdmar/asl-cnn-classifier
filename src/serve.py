@@ -8,7 +8,7 @@ Exposes two endpoints:
   ``{"class", "confidence"}`` entries.
 
 The model is loaded once at import time via
-:func:`src.infer_camera.load_checkpoint` (random-init fallback when no
+:func:`src.checkpoint.load_checkpoint` (random-init fallback when no
 checkpoint exists), and every request reuses
 :func:`src.dataset.get_eval_transforms` for preprocessing — there is no second
 copy of the resize/normalize logic. The module-level ``app`` object is importable

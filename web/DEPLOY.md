@@ -67,8 +67,9 @@ After deploy, the live site should:
 
 - load the dark landing page with the hero and four sections,
 - classify the bundled **A** example to **A** (real in-browser inference),
-- render the metrics dashboard with 96.8% / 97.8% / 1,631 and the ECE 0.046
-  reliability diagram,
+- render the metrics dashboard with the deployed same-dataset numbers
+  (96.9% test accuracy / 97.3% best val / 3,170 test samples) and the honest
+  55.5% cross-dataset headline, plus the ECE 0.025 reliability diagram,
 - show the `/about` model card.
 
 The CI `web` job gates merges on: strict TypeScript, ESLint, unit + cross-language
