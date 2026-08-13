@@ -144,7 +144,7 @@ python -m src.infer_camera --source data/sample/A/0.png
 
 ## The honest-accuracy story
 
-Most portfolio models report whatever number looks best. This one reports the number that's
+Most published models report whatever number looks best. This one reports the number that's
 *true*. A naive split of single-signer data gives a flattering **96.9% same-dataset**
 accuracy — but those test images look just like the training images, so it's inflated by
 leakage. The number that matters is **cross-dataset accuracy on a different dataset the model

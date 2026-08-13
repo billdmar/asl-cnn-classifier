@@ -29,7 +29,7 @@
 
 ## Intended Use
 
-- **Primary use:** An educational / portfolio demonstration of an end-to-end
+- **Primary use:** An educational demonstration of an end-to-end
   computer-vision pipeline — training, evaluation, real-time inference, and
   benchmarking — for static ASL alphabet recognition.
 - **Intended users:** Learners and engineers exploring CNN image classification

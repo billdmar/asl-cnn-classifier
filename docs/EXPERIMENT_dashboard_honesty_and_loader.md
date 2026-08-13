@@ -30,7 +30,7 @@ headline real-world number yet."* That was false. Fixed:
 - 56 web tests + eslint + `next build` green.
 
 This is the round's highest-value deliverable: it corrects a false statement on
-the employer-facing live site and surfaces real work that was hidden.
+the live site and surfaces real work that was hidden.
 
 ## A — flexible filename-label loader (shipped)
 
