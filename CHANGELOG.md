@@ -104,7 +104,7 @@ labelled leakage-inflated contrast, never as a headline.
   reveals are transform-only (translateY, no opacity) to stay AA-contrast/LCP/axe-safe;
   interactive panels are intentionally not reveal-wrapped to preserve click
   actionability.
-- **Recruiter-polish README** — leads with the live in-browser ML web app (live-demo
+- **README overhaul** — leads with the live in-browser ML web app (live-demo
   link first + a real deployed-app screenshot `docs/web-hero.png`), an honest
   55.5% / 59.8% headline (96.9% only as the labelled leakage contrast), and a new
   "honest-accuracy story" section with a metrics-dashboard screenshot. Updated badges
