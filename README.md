@@ -19,6 +19,22 @@ analysis.
 
 ---
 
+## ▶ Demo
+
+![ASL inference pipeline demo](docs/demo.gif)
+
+The clip shows the **real-time inference pipeline** end-to-end — centered ROI
+crop → `get_eval_transforms` preprocess → CNN forward → top-1 softmax — driven by
+the same code path as the live OpenCV camera loop. The inputs are the committed
+**synthetic** `data/sample/` fixtures (not real hands), and no trained checkpoint
+ships in the repo, so the per-frame labels/confidences are **illustrative of the
+interface only, not real accuracy**. To get meaningful predictions, train on the
+full Kaggle ASL Alphabet dataset — see
+[Reproducing 98%](#reproducing-the-98-accuracy-target). Regenerate the GIF with
+`python -m scripts.make_demo_gif`.
+
+---
+
 ## Highlights
 
 - **Two architectures** — a compact from-scratch CNN (~657K params) and a
