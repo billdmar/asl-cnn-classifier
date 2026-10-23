@@ -13,7 +13,7 @@
 gradio>=5.49,<7.0
 torch>=2.2,<3.0
 torchvision>=0.17,<1.0
-pillow>=10.0,<13.0
+pillow>=10.0,<14.0
 numpy>=1.26,<2.5
 PyYAML>=6.0,<7.0
 # Imported transitively at app import time: src.infer_camera imports cv2 and
